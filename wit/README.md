@@ -51,7 +51,10 @@ truncation — treating truncation as end-of-data is a downgrade hazard.
 
 The futures returned by `send` and `receive` resolve when their
 direction finishes: `ok` for a clean close, an `error` for handshake
-failure, peer misbehavior, or transport failure.
+failure, peer misbehavior, or transport failure. Stream closures never
+wait on the futures: every stream reaches its final state from protocol
+events alone, so a consumer may read a direction's future after
+draining its stream, concurrently, or never.
 
 ## Signing policy
 
