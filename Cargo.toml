@@ -1,5 +1,13 @@
 [workspace]
-members = ["rust/profile", "rust/tls", "rust/quinn", "rust/quinn-wasi", "examples/quic-loopback"]
+members = [
+    "rust/profile",
+    "rust/tls",
+    "rust/quinn",
+    "rust/quinn-wasi",
+    "rust/component",
+    "examples/quic-loopback",
+    "examples/tls-loopback",
+]
 resolver = "2"
 
 [workspace.package]
@@ -22,6 +30,9 @@ lann-tls-quinn = { path = "rust/quinn" }
 lann-quinn-wasi = { path = "rust/quinn-wasi" }
 
 wasi = "0.14"
+wit-bindgen = { version = "0.60", features = ["async-spawn"] }
+wasip3 = "0.7"
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = "0.9"

@@ -1,0 +1,23 @@
+[package]
+name = "lann-tls-component"
+description = "The lann:tls component: the profile's enforced delivery over component-model async streams"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Build for the tls-delegated world (imports the signer interface) instead
+# of the tls world.
+delegated-signer = []
+
+[dependencies]
+lann-tls = { workspace = true }
+lann-tls-profile = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+wit-bindgen = { workspace = true }
+futures = { workspace = true }
