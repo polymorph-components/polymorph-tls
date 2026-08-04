@@ -1,0 +1,18 @@
+[workspace]
+members = ["rust/profile"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+lann-tls-profile = { path = "rust/profile" }
+
+rustls = { version = "0.23", default-features = false, features = ["std"] }
+rustls-pki-types = "1"
+rustls-rustcrypto = { git = "https://github.com/RustCrypto/rustls-rustcrypto", default-features = false, features = ["std", "zeroize"] }
+quinn-proto = { version = "0.11", default-features = false }
+
+ed25519-dalek = { version = "3", default-features = false, features = ["alloc", "pkcs8", "zeroize"] }
