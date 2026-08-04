@@ -78,12 +78,16 @@ impl KeyProvider for Ed25519OnlyKeyProvider {
 }
 
 /// A QUIC-ready client config: TLS 1.3 only, early data enabled (0-RTT).
-pub fn client_config(roots: rustls::RootCertStore) -> rustls::ClientConfig {
+///
+/// `alpn` is required: QUIC mandates ALPN (RFC 9001 §8.1), and rustls
+/// refuses QUIC handshakes without it.
+pub fn client_config(roots: rustls::RootCertStore, alpn: &[&[u8]]) -> rustls::ClientConfig {
     let mut config = rustls::ClientConfig::builder_with_provider(provider())
         .with_protocol_versions(&[&rustls::version::TLS13])
         .expect("the profile provider supports TLS 1.3")
         .with_root_certificates(roots)
         .with_no_client_auth();
+    config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
     config.enable_early_data = true;
     config
 }
@@ -91,7 +95,13 @@ pub fn client_config(roots: rustls::RootCertStore) -> rustls::ClientConfig {
 /// A QUIC-ready server config: TLS 1.3 only, 0-RTT accepted
 /// (`max_early_data_size` is `u32::MAX`, the only nonzero value QUIC
 /// permits).
-pub fn server_config(identity: ServerIdentity) -> Result<rustls::ServerConfig, rustls::Error> {
+///
+/// `alpn` is required: QUIC mandates ALPN (RFC 9001 §8.1), and rustls
+/// refuses QUIC handshakes without it.
+pub fn server_config(
+    identity: ServerIdentity,
+    alpn: &[&[u8]],
+) -> Result<rustls::ServerConfig, rustls::Error> {
     let builder = rustls::ServerConfig::builder_with_provider(provider())
         .with_protocol_versions(&[&rustls::version::TLS13])
         .expect("the profile provider supports TLS 1.3")
@@ -105,6 +115,7 @@ pub fn server_config(identity: ServerIdentity) -> Result<rustls::ServerConfig, r
             StaticResolver(Arc::new(CertifiedKey::new(chain, signer))),
         )),
     };
+    config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
     config.max_early_data_size = u32::MAX;
     Ok(config)
 }
