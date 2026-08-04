@@ -15,6 +15,17 @@ constructor accepts ECDSA or RSA private key material, and the provider's
 key loader parses Ed25519 PKCS#8 only. In-guest class-D signing is not a
 configuration this crate can express.
 
+This is the *curated* delivery: it trades away the component's
+memory-isolation benefit (session keys and any identity key share linear
+memory with the application) for zero boundary plumbing. Deployments that
+want the profile *enforced* — no configuration surface at all, secrets in
+a separate component's memory — should compose the component delivery
+instead (see the [repository README](../../README.md), "Design").
+
+QUIC consumers: the core is deliberately QUIC-free. The quinn
+compatibility layer is [`lann-tls-quinn`](../quinn/README.md), driven over
+`wasi:sockets` by [`lann-quinn-wasi`](../quinn-wasi/).
+
 ## Provider selection: `rustls-rustcrypto`
 
 The provider is assembled from
