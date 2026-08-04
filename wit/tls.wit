@@ -92,9 +92,11 @@ interface server {
 
         /// An identity whose signatures are produced by the composed
         /// signer (see the `signer` interface). The private key never
-        /// exists inside this component. Fails if no signer is composed.
+        /// exists inside this component. Construction consults the
+        /// composed signer for its capabilities and fails if no signer is
+        /// composed or it reports no usable schemes.
         /// The certificate chain is leaf first.
-        delegated: static func(chain: list<certificate-der>) -> result<identity, error>;
+        delegated: static async func(chain: list<certificate-der>) -> result<identity, error>;
     }
 
     /// A single incoming TLS connection.
@@ -123,9 +125,9 @@ interface server {
 
 /// An external signer for the endpoint's own CertificateVerify message.
 ///
-/// Implementations hold a TLS server identity's private key — typically
-/// outside the guest entirely (a host provider, an HSM, a key service).
-/// The TLS implementation calls `sign` at most once per handshake.
+/// Implementations hold a TLS identity's private key — typically outside
+/// the guest entirely (a host provider, an HSM, a key service) — and may
+/// suspend while producing a signature.
 ///
 /// Security:
 /// - The message is the complete RFC 8446 §4.4.3 CertificateVerify
@@ -146,9 +148,19 @@ interface signer {
         ed25519,
     }
 
+    /// The schemes this signer can produce, in the signer's preference
+    /// order. The set is fixed for the lifetime of the composition; the
+    /// TLS implementation may cache it. An empty list makes delegated
+    /// identities unusable.
+    schemes: async func() -> list<signature-scheme>;
+
     /// Signs `message` with the identity's private key under `scheme`,
     /// returning the signature in the scheme's TLS wire encoding (RFC
     /// 8446 §4.2.3). The error string is for diagnostics only.
+    ///
+    /// Called at most once per handshake, on the connection's critical
+    /// path: a slow implementation stalls the calling endpoint's other
+    /// connections for the duration of the call.
     sign: async func(scheme: signature-scheme, message: list<u8>) -> result<list<u8>, string>;
 }
 

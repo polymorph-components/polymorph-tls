@@ -1,0 +1,14 @@
+[package]
+name = "test-signer"
+description = "Test implementation of lann:tls/signer: signs with a fixture Ed25519 key, standing in for a key held outside the guest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = { workspace = true }
+ed25519-dalek = { workspace = true }

@@ -48,7 +48,7 @@ impl wasip3::exports::cli::run::Guest for Component {
             "ed25519 identity must reject non-Ed25519 key material",
         );
         assert!(
-            Identity::delegated(&[LEAF_DER.to_vec()]).is_err(),
+            Identity::delegated(vec![LEAF_DER.to_vec()]).await.is_err(),
             "delegated identity must fail without a composed signer",
         );
         println!("structural gates hold (P-256 key rejected; no signer composed)");

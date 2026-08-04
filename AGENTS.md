@@ -34,6 +34,10 @@ design record.
   `tls-delegated` world.
 - `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
   guests; `quic-loopback` also carries the QUIC interop endpoint modes.
+- `examples/tls-delegated-loopback`, `examples/test-signer`,
+  `examples/webcrypto-signer` — the delegated-signer rig: the
+  `tls-delegated` smoke guest, the self-contained fixture signer, and
+  the shim adapting a `lann:webcrypto` provider to `lann:tls/signer`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
 - `scripts/` — audit helper and the interop harnesses (with their Go
@@ -44,7 +48,7 @@ design record.
 | Recipe | Verifies |
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
-| `just smoke` | both loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, and the wac-composed TLS component (component-model async) with its import-satisfaction gate |
+| `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `lann:webcrypto` provider |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 

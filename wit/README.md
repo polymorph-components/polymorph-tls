@@ -82,7 +82,9 @@ delegated posture.
   carry a signing capability at all.
 - `tls-delegated`: imports `signer`. Choose this for delegated
   identities, and satisfy the import with a host-side provider or
-  another component.
+  another component. Constructing a delegated identity consults the
+  composed signer (hence `identity.delegated` is async); each handshake
+  with one calls `sign` once.
 
 ## Relationship to `wasi-tls` (recorded ruling)
 
@@ -118,6 +120,16 @@ never accumulated silently.
   import/export direction anyway (resource types are instance-bound). A
   small shim component can adapt a `lann:webcrypto` provider to
   `signer`.
+- **The signer interface is async-typed but consumable synchronously.**
+  Implementations may suspend — they hold keys behind other components,
+  host providers, or hardware — while a TLS implementation typically
+  produces CertificateVerify inside a synchronous handshake state
+  machine. The canonical ABI bridges the two: an implementation may
+  sync-lower the import, and its async-lifted calling task blocks for
+  the duration of the signer subtask. The visible consequence in this
+  package's shape: `identity.delegated` is async (construction consults
+  the signer), and a slow `sign` stalls the calling endpoint's other
+  connections, as its documentation warns.
 - **`signer` errors are strings**, not the `types.error` resource: the
   signer is implemented on the other side of the boundary from this
   package's implementation, which could not mint or interpret a foreign

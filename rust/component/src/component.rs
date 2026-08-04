@@ -25,6 +25,13 @@ wit_bindgen::generate!({
     path: "../../wit",
     world: "tls-delegated",
     generate_all,
+    // The signer interface is async-typed (implementations may suspend),
+    // but rustls consumes signatures synchronously, so these imports are
+    // sync-lowered: the calling task blocks while the signer subtask runs.
+    async: [
+        "-import:lann:tls/signer@0.1.0#sign",
+        "-import:lann:tls/signer@0.1.0#schemes",
+    ],
 });
 
 use exports::lann::tls::client::{Guest as ClientGuest, GuestConnector};
@@ -126,6 +133,8 @@ pub enum Identity {
     #[cfg_attr(not(feature = "delegated-signer"), allow(dead_code))]
     Delegated {
         chain: Vec<CertificateDer<'static>>,
+        /// The composed signer's schemes, fetched once at construction.
+        schemes: Vec<rustls::SignatureScheme>,
     },
 }
 
@@ -144,7 +153,9 @@ impl GuestIdentity for Identity {
     }
 
     #[cfg(not(feature = "delegated-signer"))]
-    fn delegated(_chain: Vec<Vec<u8>>) -> Result<exports::lann::tls::server::Identity, Error> {
+    async fn delegated(
+        _chain: Vec<Vec<u8>>,
+    ) -> Result<exports::lann::tls::server::Identity, Error> {
         Err(TlsError::resource(
             "no signer is composed: this build serves the `tls` world; delegated identities \
              require the `tls-delegated` world",
@@ -152,9 +163,16 @@ impl GuestIdentity for Identity {
     }
 
     #[cfg(feature = "delegated-signer")]
-    fn delegated(chain: Vec<Vec<u8>>) -> Result<exports::lann::tls::server::Identity, Error> {
+    async fn delegated(chain: Vec<Vec<u8>>) -> Result<exports::lann::tls::server::Identity, Error> {
+        let schemes = delegated::signer_schemes();
+        if schemes.is_empty() {
+            return Err(TlsError::resource(
+                "the composed signer reports no usable signature schemes",
+            ));
+        }
         Ok(exports::lann::tls::server::Identity::new(Self::Delegated {
             chain: chain.into_iter().map(CertificateDer::from).collect(),
+            schemes,
         }))
     }
 }
@@ -177,6 +195,14 @@ impl GuestAcceptor for Acceptor {
                     .map(lann_tls_profile::ServerIdentity::Ed25519)
                     .ok()
             }
+            #[cfg(feature = "delegated-signer")]
+            Identity::Delegated { chain, schemes } => {
+                Some(lann_tls_profile::ServerIdentity::External {
+                    chain: chain.clone(),
+                    signer: Arc::new(delegated::DelegatedKey::new(schemes.clone())),
+                })
+            }
+            #[cfg(not(feature = "delegated-signer"))]
             Identity::Delegated { .. } => None,
         };
         Self {
@@ -231,6 +257,106 @@ impl From<HandshakeOutcome> for ConnectionInfo {
         Self {
             alpn_protocol: outcome.alpn_protocol,
             server_name: outcome.server_name,
+        }
+    }
+}
+
+/// The delegated-signing bridge: rustls's synchronous signing seam over
+/// the composed signer import.
+///
+/// The signer interface is async-typed, but these bindings are
+/// sync-lowered (see the `generate!` invocation): rustls produces the
+/// server flight — CertificateVerify included — inside its synchronous
+/// state machine, so the calling task blocks for the duration of the
+/// signer subtask. That is legal for async-lifted tasks, which all of
+/// this component's callers are.
+#[cfg(feature = "delegated-signer")]
+mod delegated {
+    use rustls::sign::{Signer, SigningKey};
+    use rustls::{SignatureAlgorithm, SignatureScheme};
+
+    use super::lann::tls::signer as import;
+
+    fn from_wit(scheme: import::SignatureScheme) -> SignatureScheme {
+        match scheme {
+            import::SignatureScheme::EcdsaSecp256r1Sha256 => SignatureScheme::ECDSA_NISTP256_SHA256,
+            import::SignatureScheme::EcdsaSecp384r1Sha384 => SignatureScheme::ECDSA_NISTP384_SHA384,
+            import::SignatureScheme::RsaPssRsaeSha256 => SignatureScheme::RSA_PSS_SHA256,
+            import::SignatureScheme::RsaPssRsaeSha384 => SignatureScheme::RSA_PSS_SHA384,
+            import::SignatureScheme::RsaPssRsaeSha512 => SignatureScheme::RSA_PSS_SHA512,
+            import::SignatureScheme::Ed25519 => SignatureScheme::ED25519,
+        }
+    }
+
+    fn to_wit(scheme: SignatureScheme) -> import::SignatureScheme {
+        match scheme {
+            SignatureScheme::ECDSA_NISTP256_SHA256 => import::SignatureScheme::EcdsaSecp256r1Sha256,
+            SignatureScheme::ECDSA_NISTP384_SHA384 => import::SignatureScheme::EcdsaSecp384r1Sha384,
+            SignatureScheme::RSA_PSS_SHA256 => import::SignatureScheme::RsaPssRsaeSha256,
+            SignatureScheme::RSA_PSS_SHA384 => import::SignatureScheme::RsaPssRsaeSha384,
+            SignatureScheme::RSA_PSS_SHA512 => import::SignatureScheme::RsaPssRsaeSha512,
+            SignatureScheme::ED25519 => import::SignatureScheme::Ed25519,
+            _ => unreachable!("scheme set originates from from_wit"),
+        }
+    }
+
+    /// The composed signer's schemes, in its preference order.
+    pub(crate) fn signer_schemes() -> Vec<SignatureScheme> {
+        import::schemes().into_iter().map(from_wit).collect()
+    }
+
+    /// A rustls `SigningKey` whose signatures come from the composed
+    /// signer.
+    #[derive(Debug)]
+    pub(crate) struct DelegatedKey {
+        schemes: Vec<SignatureScheme>,
+    }
+
+    impl DelegatedKey {
+        pub(crate) fn new(schemes: Vec<SignatureScheme>) -> Self {
+            Self { schemes }
+        }
+    }
+
+    impl SigningKey for DelegatedKey {
+        fn choose_scheme(&self, offered: &[SignatureScheme]) -> Option<Box<dyn Signer>> {
+            let scheme = self
+                .schemes
+                .iter()
+                .copied()
+                .find(|scheme| offered.contains(scheme))?;
+            Some(Box::new(DelegatedSigner { scheme }))
+        }
+
+        fn algorithm(&self) -> SignatureAlgorithm {
+            match self.schemes.first() {
+                Some(SignatureScheme::ED25519) => SignatureAlgorithm::ED25519,
+                Some(
+                    SignatureScheme::ECDSA_NISTP256_SHA256 | SignatureScheme::ECDSA_NISTP384_SHA384,
+                ) => SignatureAlgorithm::ECDSA,
+                Some(
+                    SignatureScheme::RSA_PSS_SHA256
+                    | SignatureScheme::RSA_PSS_SHA384
+                    | SignatureScheme::RSA_PSS_SHA512,
+                ) => SignatureAlgorithm::RSA,
+                _ => SignatureAlgorithm::Unknown(0),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct DelegatedSigner {
+        scheme: SignatureScheme,
+    }
+
+    impl Signer for DelegatedSigner {
+        fn sign(&self, message: &[u8]) -> Result<Vec<u8>, rustls::Error> {
+            import::sign(to_wit(self.scheme), message)
+                .map_err(|e| rustls::Error::General(format!("delegated signer failed: {e}")))
+        }
+
+        fn scheme(&self) -> SignatureScheme {
+            self.scheme
         }
     }
 }

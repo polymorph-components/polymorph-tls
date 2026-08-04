@@ -1173,6 +1173,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-signer"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "wit-bindgen 0.60.0",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,6 +1214,15 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "tls-delegated-loopback"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "wasip3",
+ "wit-bindgen 0.57.1",
+]
 
 [[package]]
 name = "tls-loopback"
@@ -1432,6 +1449,14 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webcrypto-signer"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "wit-bindgen 0.60.0",
 ]
 
 [[package]]
