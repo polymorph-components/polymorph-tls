@@ -1216,6 +1216,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tls-tcp"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "wasip3",
+ "wit-bindgen 0.57.1",
+]
+
+[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
