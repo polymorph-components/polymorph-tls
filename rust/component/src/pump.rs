@@ -198,6 +198,11 @@ pub(crate) async fn run(
 }
 
 /// Transport bytes → rustls → decrypted application data.
+///
+/// Terminal ordering is a contract: every stream end this direction owns
+/// is released before the verdict is delivered. The verdict write is a
+/// rendezvous with the consumer, and a consumer is entitled to read the
+/// cleartext stream to its close before looking at the future.
 async fn reader_task(
     conn: SharedConnection,
     mut ciphertext_in: StreamReader<u8>,
@@ -207,7 +212,7 @@ async fn reader_task(
     handshake: Handshake,
 ) {
     let mut clean_close = false;
-    'outer: loop {
+    let verdict = loop {
         let (status, buf) = ciphertext_in.read(Vec::with_capacity(CHUNK)).await;
         if !buf.is_empty() {
             let (plaintext, failed): (Vec<u8>, Option<String>) = {
@@ -248,31 +253,34 @@ async fn reader_task(
             }
             if let Some(message) = failed {
                 handshake.fail(message.clone());
-                let _ = recv_done.write(Err(TlsError::resource(message))).await;
-                break 'outer;
+                break Err(TlsError::resource(message));
             }
             if clean_close {
-                let _ = recv_done.write(Ok(())).await;
-                break;
+                break Ok(());
             }
         }
         if matches!(status, StreamResult::Dropped | StreamResult::Cancelled) {
             if clean_close {
-                let _ = recv_done.write(Ok(())).await;
-            } else {
-                handshake.fail("transport closed during handshake".into());
-                let _ = recv_done
-                    .write(Err(TlsError::resource(
-                        "transport closed without TLS close_notify (possible truncation)",
-                    )))
-                    .await;
+                break Ok(());
             }
-            break;
+            handshake.fail("transport closed during handshake".into());
+            break Err(TlsError::resource(
+                "transport closed without TLS close_notify (possible truncation)",
+            ));
         }
-    }
+    };
+    drop(ciphertext_in);
+    drop(cleartext_out);
+    drop(ct_sink);
+    let _ = recv_done.write(verdict).await;
 }
 
 /// Consumer application data → rustls → transmit queue.
+///
+/// Terminal ordering as in [`reader_task`]: the transmit-queue sink is
+/// released before the verdict rendezvous, so `close_notify` and the
+/// ciphertext stream's closure reach the transport regardless of when
+/// (or whether) the consumer reads the future.
 async fn writer_task(
     conn: SharedConnection,
     mut cleartext_in: StreamReader<u8>,
@@ -280,7 +288,7 @@ async fn writer_task(
     send_done: FutureWriter<Result<(), Error>>,
     handshake: Handshake,
 ) {
-    loop {
+    let verdict = loop {
         let (status, buf) = cleartext_in.read(Vec::with_capacity(CHUNK)).await;
         if !buf.is_empty() {
             let write_error = {
@@ -295,10 +303,7 @@ async fn writer_task(
                 }
             };
             if let Some(e) = write_error {
-                let _ = send_done
-                    .write(Err(TlsError::resource(format!("write failed: {e}"))))
-                    .await;
-                return;
+                break Err(TlsError::resource(format!("write failed: {e}")));
             }
         }
         if matches!(status, StreamResult::Dropped | StreamResult::Cancelled) {
@@ -307,10 +312,12 @@ async fn writer_task(
                 conn.send_close_notify();
                 drain_tls_writes(&mut conn, &ct_sink);
             }
-            let _ = send_done.write(Ok(())).await;
-            return;
+            break Ok(());
         }
-    }
+    };
+    drop(cleartext_in);
+    drop(ct_sink);
+    let _ = send_done.write(verdict).await;
 }
 
 /// Transmit queue → ciphertext stream, in order.

@@ -33,8 +33,11 @@ design record.
   wasm-only cdylib, `delegated-signer` feature selects the
   `tls-delegated` world.
 - `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
-  guests.
-- `scripts/` — audit helpers.
+  guests; `quic-loopback` also carries the QUIC interop endpoint modes.
+- `examples/tls-tcp` — the real-transport demo guest: the composed
+  component over `wasi:sockets` TCP; also the TLS interop endpoint.
+- `scripts/` — audit helper and the interop harnesses (with their Go
+  peer in `scripts/interop/peer`).
 
 ## Checks
 
@@ -42,6 +45,7 @@ design record.
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
 | `just smoke` | both loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, and the wac-composed TLS component (component-model async) with its import-satisfaction gate |
+| `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 
 Two invariants are already fixed:

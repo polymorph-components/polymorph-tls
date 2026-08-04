@@ -34,3 +34,15 @@ smoke-tls: build-wasm
 audit:
     cargo build -p quic-loopback --target wasm32-wasip2 --release
     python3 scripts/audit-aes-tables.py target/wasm32-wasip2/release/quic-loopback.wasm
+
+# Cross-implementation interop, both directions, over real transports.
+interop: interop-tls interop-quic
+
+# The composed component against OpenSSL and Go TLS peers over
+# wasi:sockets TCP, including the close_notify-vs-truncation scenarios.
+interop-tls: build-wasm
+    scripts/interop-tls.sh
+
+# The quinn leg against quic-go over wasi:sockets UDP.
+interop-quic: build-wasm
+    scripts/interop-quic.sh

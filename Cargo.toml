@@ -7,6 +7,7 @@ members = [
     "rust/component",
     "examples/quic-loopback",
     "examples/tls-loopback",
+    "examples/tls-tcp",
 ]
 resolver = "2"
 
