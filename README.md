@@ -6,10 +6,12 @@ over `wasi:sockets`. A sibling of
 [`lann:webrtc-datachannels`](https://github.com/lann/webrtc-datachannels),
 following the same architecture.
 
-**Status: designed, not built.** This repository currently holds the design
-and its open requirements (see the
-[issue tracker](https://github.com/lann/component-tls/issues)); no WIT or
-implementation exists yet.
+**Status: spike implementation.** The WIT package, the profile and its
+two deliveries, the quinn compatibility layer, and the `wasi:sockets`
+adapter exist and pass composed smoke tests under Wasmtime. Timing
+verification, performance measurement, the delegated-signer bridge, and
+interop hardening remain — see the
+[issue tracker](https://github.com/lann/component-tls/issues).
 
 ## Why pure-wasm TLS 1.3 is plausible
 

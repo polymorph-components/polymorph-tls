@@ -11,11 +11,38 @@ to serve QUIC over `wasi:sockets`. A sibling of
 deliberately mirroring their architecture — prefer clarity and correctness
 over features. See [`README.md`](README.md) for the design.
 
-The repository is **design-stage**: no WIT, no code, no build system yet.
-The open requirements live in the GitHub issue tracker, and the README is
-the design record. Do not invent layout, recipes, or CI that do not exist;
-add sections to this file as the artifacts they describe come into
-existence.
+The repository holds the `lann:tls` WIT package (`wit/`, with its README
+of recorded rulings), the Rust deliveries, and their validation rigs. The
+open requirements live in the GitHub issue tracker, and the README is the
+design record.
+
+## Layout
+
+- `wit/` — the `lann:tls` package; `wit/README.md` carries the package
+  contracts and recorded rulings (wasi-tls relationship, signer seam,
+  worlds).
+- `rust/profile` — the algorithm profile as data plus the identity types;
+  the single policy source. Its README is the profile document.
+- `rust/tls` — the curated core delivery: profile provider + TLS 1.3
+  configs. Deliberately QUIC-free. Its README records the provider audit.
+- `rust/quinn` — quinn compatibility: RFC 9001 packet protection,
+  quinn-proto session glue, endpoint keys.
+- `rust/quinn-wasi` — quinn-proto driver over `wasi:sockets` UDP; no TLS
+  or profile dependency.
+- `rust/component` — the `lann:tls` component (enforced delivery);
+  wasm-only cdylib, `delegated-signer` feature selects the
+  `tls-delegated` world.
+- `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
+  guests.
+- `scripts/` — audit helpers.
+
+## Checks
+
+| Recipe | Verifies |
+| --- | --- |
+| `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
+| `just smoke` | both loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, and the wac-composed TLS component (component-model async) with its import-satisfaction gate |
+| `just audit` | no AES table constants reachable in the release wasm artifact |
 
 Two invariants are already fixed:
 
@@ -158,9 +185,8 @@ so closed numbers remain stable references.
 
 ## Direction
 
-The bootstrap issue set is the roadmap: the algorithm profile, the
-component world and its `wasi-tls` alignment, the Rust guest library, the
-`quinn-proto`/`wasi:sockets` adapter, the crypto-provider audit, timing
-verification, and performance measurement. See the open issues for the
-current state; this file gains a real layout and check-table as those
-land.
+The bootstrap issue set was the roadmap; the algorithm profile, WIT
+package, component, guest library, quinn compatibility layer, and
+`wasi:sockets` adapter have landed. See the open issues for what remains
+(timing verification, performance measurement, the delegated-signer
+bridge, interop, upstreaming).
