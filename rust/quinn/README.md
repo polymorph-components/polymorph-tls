@@ -31,7 +31,10 @@ The provider and config constructors here carry the same policy as the
 core crate — profile suites and groups in preference order, secret-free
 verification breadth, Ed25519-only key loading — plus the settings QUIC
 mandates (ALPN required, RFC 9001 §8.1; `max_early_data_size` of
-`u32::MAX`).
+`u32::MAX`). Both trust models are served: WebPKI
+(`client_config`/`server_config`) and mutually authenticated raw public
+keys (`rpk_client_config`/`rpk_server_config`, RFC 7250) — see
+[`lann-tls`'s `rpk` module](../tls/README.md) for the trust contract.
 
 ## Timing notes beyond the core table
 

@@ -80,7 +80,8 @@ impl Ed25519Identity {
         pkcs8_der: &[u8],
     ) -> Result<Self, InvalidIdentity> {
         use ed25519_dalek::pkcs8::DecodePrivateKey;
-        ed25519_dalek::SigningKey::from_pkcs8_der(pkcs8_der).map_err(|_| InvalidIdentity(()))?;
+        ed25519_dalek::SigningKey::from_pkcs8_der(pkcs8_der)
+            .map_err(|_| InvalidIdentity("key material is not an Ed25519 PKCS#8 document"))?;
         Ok(Self {
             chain,
             key_der: PrivateKeyDer::Pkcs8(pkcs8_der.to_vec().into()),
@@ -111,13 +112,13 @@ impl fmt::Debug for Ed25519Identity {
     }
 }
 
-/// The key material was not an Ed25519 PKCS#8 document.
+/// The key material cannot serve as a profile identity.
 #[derive(Debug)]
-pub struct InvalidIdentity(());
+pub struct InvalidIdentity(&'static str);
 
 impl fmt::Display for InvalidIdentity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("key material is not an Ed25519 PKCS#8 document")
+        f.write_str(self.0)
     }
 }
 
@@ -164,6 +165,146 @@ impl fmt::Debug for ServerIdentity {
     }
 }
 
+// --- Raw public keys (RFC 7250) ---
+
+/// The DER prefix of an Ed25519 `SubjectPublicKeyInfo` (RFC 8410,
+/// algorithm 1.3.101.112). The 32-byte public key follows it.
+const ED25519_SPKI_PREFIX: [u8; 12] = [
+    0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+];
+
+/// Encodes an Ed25519 public key as a DER `SubjectPublicKeyInfo` — the
+/// bytes a raw-public-key "certificate" carries on the wire.
+pub fn ed25519_spki(public_key: &[u8; 32]) -> Vec<u8> {
+    let mut spki = ED25519_SPKI_PREFIX.to_vec();
+    spki.extend_from_slice(public_key);
+    spki
+}
+
+/// The Ed25519 public key inside a DER `SubjectPublicKeyInfo`, if it is
+/// one. Use this to read a peer's authenticated key out of a
+/// raw-public-key "certificate".
+pub fn public_key_from_ed25519_spki(spki: &[u8]) -> Option<[u8; 32]> {
+    let (prefix, key) = spki.split_at_checked(ED25519_SPKI_PREFIX.len())?;
+    if prefix != ED25519_SPKI_PREFIX {
+        return None;
+    }
+    key.try_into().ok()
+}
+
+/// A raw-public-key identity (RFC 7250): a bare Ed25519 key whose public
+/// half *is* the endpoint's identity.
+///
+/// Raw public keys are the profile's peer-to-peer posture: no chain, no
+/// PKI — a verified connection authenticates possession of the private
+/// key behind the presented public key, nothing else. The same identity
+/// type serves both roles; under this posture connections are mutually
+/// authenticated, so clients sign CertificateVerify too, governed by the
+/// same signing policy as servers:
+///
+/// - [`from_pkcs8_der`](Self::from_pkcs8_der): an Ed25519 key (class B)
+///   signing in-guest.
+/// - [`external`](Self::external): a caller-supplied signer holding the
+///   key elsewhere.
+///
+/// The profile's raw-public-key identities are Ed25519 only; there is no
+/// way to build one around another algorithm.
+pub struct RpkIdentity {
+    public_key: [u8; 32],
+    signer: RpkSignerInner,
+}
+
+enum RpkSignerInner {
+    Ed25519 {
+        key_der: PrivateKeyDer<'static>,
+    },
+    External {
+        signer: Arc<dyn rustls::sign::SigningKey>,
+    },
+}
+
+/// A borrowed view of how an [`RpkIdentity`] signs, for the delivery
+/// crates that assemble rustls configurations from it.
+pub enum RpkSigner<'a> {
+    /// A validated Ed25519 PKCS#8 document; signing runs in-guest.
+    Ed25519Pkcs8(&'a PrivateKeyDer<'static>),
+    /// A caller-supplied signer; the private key lives behind it.
+    External(&'a Arc<dyn rustls::sign::SigningKey>),
+}
+
+impl RpkIdentity {
+    /// Builds an identity from a PKCS#8 v1/v2 DER document holding an
+    /// Ed25519 private key; the public key is derived from it.
+    ///
+    /// Fails if the document does not parse as an Ed25519 key — ECDSA and
+    /// RSA documents are rejected, they do not fall back to any other
+    /// signing path.
+    pub fn from_pkcs8_der(pkcs8_der: &[u8]) -> Result<Self, InvalidIdentity> {
+        use ed25519_dalek::pkcs8::DecodePrivateKey;
+        let key = ed25519_dalek::SigningKey::from_pkcs8_der(pkcs8_der)
+            .map_err(|_| InvalidIdentity("key material is not an Ed25519 PKCS#8 document"))?;
+        Ok(Self {
+            public_key: key.verifying_key().to_bytes(),
+            signer: RpkSignerInner::Ed25519 {
+                key_der: PrivateKeyDer::Pkcs8(pkcs8_der.to_vec().into()),
+            },
+        })
+    }
+
+    /// Builds an identity around a caller-supplied signer whose private
+    /// key lives elsewhere (typically outside the guest).
+    ///
+    /// The signer must report its public key
+    /// ([`SigningKey::public_key`](rustls::sign::SigningKey::public_key))
+    /// as an Ed25519 `SubjectPublicKeyInfo`; anything else is rejected.
+    pub fn external(signer: Arc<dyn rustls::sign::SigningKey>) -> Result<Self, InvalidIdentity> {
+        let spki = signer
+            .public_key()
+            .ok_or(InvalidIdentity("signer does not expose its public key"))?;
+        let public_key = public_key_from_ed25519_spki(spki.as_ref()).ok_or(InvalidIdentity(
+            "signer's public key is not an Ed25519 SPKI",
+        ))?;
+        Ok(Self {
+            public_key,
+            signer: RpkSignerInner::External { signer },
+        })
+    }
+
+    /// The identity's Ed25519 public key — the value a peer authenticates.
+    pub fn public_key(&self) -> [u8; 32] {
+        self.public_key
+    }
+
+    /// The identity's public key as the DER `SubjectPublicKeyInfo` it
+    /// presents on the wire.
+    pub fn spki_der(&self) -> Vec<u8> {
+        ed25519_spki(&self.public_key)
+    }
+
+    /// How this identity signs.
+    pub fn signer(&self) -> RpkSigner<'_> {
+        match &self.signer {
+            RpkSignerInner::Ed25519 { key_der } => RpkSigner::Ed25519Pkcs8(key_der),
+            RpkSignerInner::External { signer } => RpkSigner::External(signer),
+        }
+    }
+}
+
+impl fmt::Debug for RpkIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RpkIdentity")
+            .field("public_key", &self.public_key)
+            .field(
+                "signer",
+                match self.signer {
+                    RpkSignerInner::Ed25519 { .. } => &"Ed25519",
+                    RpkSignerInner::External { .. } => &"External",
+                },
+            )
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +322,26 @@ mod tests {
     fn accepts_ed25519_pkcs8() {
         const ED25519_PKCS8: &[u8] = include_bytes!("testdata/ed25519-key.p8");
         assert!(Ed25519Identity::from_pkcs8_der(Vec::new(), ED25519_PKCS8).is_ok());
+    }
+
+    /// The same shape rule holds for raw-public-key identities.
+    #[test]
+    fn rpk_rejects_non_ed25519_pkcs8() {
+        const P256_PKCS8: &[u8] = include_bytes!("testdata/p256-key.p8");
+        assert!(RpkIdentity::from_pkcs8_der(P256_PKCS8).is_err());
+    }
+
+    #[test]
+    fn rpk_public_key_roundtrips_through_spki() {
+        const ED25519_PKCS8: &[u8] = include_bytes!("testdata/ed25519-key.p8");
+        let identity = RpkIdentity::from_pkcs8_der(ED25519_PKCS8).unwrap();
+        let spki = identity.spki_der();
+        assert_eq!(
+            public_key_from_ed25519_spki(&spki),
+            Some(identity.public_key()),
+        );
+        // A P-256 SPKI (or any non-Ed25519 DER) does not parse.
+        assert_eq!(public_key_from_ed25519_spki(&spki[1..]), None);
+        assert_eq!(public_key_from_ed25519_spki(b"not spki"), None);
     }
 }

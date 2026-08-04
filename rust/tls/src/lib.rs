@@ -8,7 +8,11 @@
 //!   cipher suites and key-exchange groups, whose key loader accepts only
 //!   Ed25519 private keys.
 //! - [`client_config`] / [`server_config`]: TLS 1.3-only rustls configs
-//!   under that provider.
+//!   under that provider, for WebPKI-style deployments (root-store trust,
+//!   X.509 server identity, unauthenticated clients).
+//! - [`rpk`]: raw-public-key connections (RFC 7250) — the mutually
+//!   authenticated peer-to-peer posture, where a bare Ed25519 key is the
+//!   peer's identity.
 //!
 //! A consumer of this crate makes no algorithm choices. The crate's
 //! opinions bind only its users: dropping to rustls directly is always
@@ -21,6 +25,8 @@
 
 use std::fmt;
 use std::sync::Arc;
+
+pub mod rpk;
 
 use lann_tls_profile::ServerIdentity;
 use rustls::crypto::{CryptoProvider, KeyProvider};
@@ -84,8 +90,9 @@ impl KeyProvider for Ed25519OnlyKeyProvider {
 
 /// A TLS 1.3-only client config under the profile provider.
 ///
-/// Clients under the profile send no client certificates and hold no
-/// identity key: the client path is entirely class ≤ B.
+/// Clients under this constructor send no client certificates and hold no
+/// identity key: this client path is entirely class ≤ B. For mutually
+/// authenticated raw-public-key connections, see [`rpk::client_config`].
 pub fn client_config(roots: rustls::RootCertStore) -> rustls::ClientConfig {
     rustls::ClientConfig::builder_with_provider(provider())
         .with_protocol_versions(&[&rustls::version::TLS13])

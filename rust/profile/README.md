@@ -73,8 +73,11 @@ The profile permits exactly two postures, and this crate's
 2. **Delegated signing**: a caller-supplied signer holds the private key
    outside the guest. This is the posture for WebPKI identities.
 
-Clients under this profile send no client certificates and hold no
-identity key: the client path is entirely class ≤ B.
+The postures attach to whichever role authenticates, not to servers as
+such. Under the WebPKI trust model only servers do, so that client path
+holds no identity key and is entirely class ≤ B. Under mutual
+authentication (the raw-public-key model below) the client signs its own
+CertificateVerify too, governed by the same two postures.
 
 ### The PKI consequence
 
@@ -83,6 +86,32 @@ endpoint *verifies*; the algorithm it *signs* with is determined by its
 own certificate, so an Ed25519-only endpoint is conformant. But no public
 CA issues Ed25519 certificates, so posture 1 requires a private PKI;
 WebPKI (ECDSA/RSA) identities require posture 2.
+
+## Raw public keys (RFC 7250)
+
+The profile's peer-to-peer trust model: both endpoints present a bare
+Ed25519 `SubjectPublicKeyInfo` in place of a certificate chain, the
+connection is mutually authenticated, and the peer's public key is its
+identity. `RpkIdentity` carries the same two signing postures as
+`ServerIdentity`; there is no way to build a raw-public-key identity
+around any algorithm but Ed25519.
+
+What a verified connection authenticates: possession of the private key
+behind the presented public key — nothing else. No names, no expiry, no
+revocation. Timing-wise the model is strictly inside the profile: chain
+verification (already secret-free) disappears entirely, peer
+verification remains secret-free Ed25519, and each side's own signature
+is class B in-guest or delegated.
+
+Two scope notes:
+
+- RFC 7250 requires support on both peers (rustls, OpenSSL 3.2+, GnuTLS,
+  wolfSSL — not BoringSSL, Go, browsers, or platform stacks). It is a
+  controlled-both-ends deployment shape, never a WebPKI substitute.
+- It is specific to the profile's in-process deliveries. Host-terminated
+  TLS providers generally cannot serve RFC 7250, so raw-public-key
+  consumers are pinned to the in-guest implementation; the `lann:tls`
+  component surface deliberately does not carry it.
 
 ## TLS versions
 

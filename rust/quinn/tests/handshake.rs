@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
-use lann_tls_profile::{Ed25519Identity, ServerIdentity};
+use lann_tls_profile::{Ed25519Identity, RpkIdentity, ServerIdentity};
 use quinn_proto::{
     ClientConfig, Connection, ConnectionHandle, DatagramEvent, Dir, Endpoint, EndpointConfig,
     Event, ServerConfig,
@@ -42,18 +42,11 @@ struct Pump {
 }
 
 impl Pump {
-    fn new() -> Self {
+    fn new(tls_server: rustls::ServerConfig) -> Self {
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
             lann_tls_quinn::ResetKey::new(b"test reset key"),
         )));
 
-        let identity = Ed25519Identity::from_pkcs8_der(
-            vec![CertificateDer::from(LEAF_DER.to_vec())],
-            LEAF_KEY_P8,
-        )
-        .expect("testdata leaf key is Ed25519");
-        let tls_server = lann_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
-            .expect("server config builds");
         let quic_server: lann_tls_quinn::QuicServerConfig =
             tls_server.try_into().expect("initial suite present");
         let server_config = ServerConfig::new(
@@ -73,18 +66,13 @@ impl Pump {
         }
     }
 
-    fn connect(&mut self) {
-        let mut roots = rustls::RootCertStore::empty();
-        roots
-            .add(CertificateDer::from(CA_DER.to_vec()))
-            .expect("testdata CA parses");
-        let tls_client = lann_tls_quinn::client_config(roots, ALPN);
+    fn connect(&mut self, tls_client: rustls::ClientConfig, server_name: &str) {
         let quic_client: lann_tls_quinn::QuicClientConfig =
             tls_client.try_into().expect("initial suite present");
         let config = ClientConfig::new(Arc::new(quic_client));
         let (ch, conn) = self
             .client
-            .connect(self.now, config, server_addr(), "localhost")
+            .connect(self.now, config, server_addr(), server_name)
             .expect("connect");
         self.client_conn = Some((ch, conn));
     }
@@ -223,12 +211,8 @@ fn drain_events(conn: &mut Connection) -> Vec<Event> {
     events
 }
 
-#[test]
-fn handshake_and_stream_roundtrip() {
-    let mut pump = Pump::new();
-    pump.connect();
-
-    // Handshake to Connected on both sides.
+/// Runs both sides to `Connected`, or panics on stall.
+fn handshake_to_connected(pump: &mut Pump) {
     let mut client_connected = false;
     let mut server_connected = false;
     pump.run_until(|p| {
@@ -248,6 +232,30 @@ fn handshake_and_stream_roundtrip() {
         }
         client_connected && server_connected
     });
+}
+
+fn webpki_server_config() -> rustls::ServerConfig {
+    let identity =
+        Ed25519Identity::from_pkcs8_der(vec![CertificateDer::from(LEAF_DER.to_vec())], LEAF_KEY_P8)
+            .expect("testdata leaf key is Ed25519");
+    lann_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
+        .expect("server config builds")
+}
+
+fn webpki_client_config() -> rustls::ClientConfig {
+    let mut roots = rustls::RootCertStore::empty();
+    roots
+        .add(CertificateDer::from(CA_DER.to_vec()))
+        .expect("testdata CA parses");
+    lann_tls_quinn::client_config(roots, ALPN)
+}
+
+#[test]
+fn handshake_and_stream_roundtrip() {
+    let mut pump = Pump::new(webpki_server_config());
+    pump.connect(webpki_client_config(), "localhost");
+
+    handshake_to_connected(&mut pump);
 
     // The server saw the client's SNI.
     {
@@ -307,4 +315,81 @@ fn handshake_and_stream_roundtrip() {
 
     assert_eq!(received, MESSAGE);
     let _ = stream_id;
+}
+
+const CLIENT_KEY_P8: &[u8] = include_bytes!("testdata/client-key.p8");
+
+/// The peer's authenticated raw public key, read from the connection.
+fn rpk_peer_key(conn: &mut Connection) -> [u8; 32] {
+    let identity = conn
+        .crypto_session()
+        .peer_identity()
+        .expect("peer identity after Connected");
+    let certs = identity
+        .downcast_ref::<Vec<CertificateDer<'static>>>()
+        .expect("peer identity type");
+    assert_eq!(certs.len(), 1, "raw public keys carry exactly one entry");
+    lann_tls::rpk::peer_public_key(&certs[0]).expect("peer presented an Ed25519 SPKI")
+}
+
+/// Mutually authenticated raw-public-key handshake: both sides read the
+/// peer's key and it is exactly the other identity's key.
+#[test]
+fn rpk_mutual_handshake() {
+    let server_identity =
+        RpkIdentity::from_pkcs8_der(LEAF_KEY_P8).expect("testdata leaf key is Ed25519");
+    let client_identity =
+        RpkIdentity::from_pkcs8_der(CLIENT_KEY_P8).expect("testdata client key is Ed25519");
+
+    let mut pump = Pump::new(
+        lann_tls_quinn::rpk_server_config(&server_identity, ALPN).expect("server config"),
+    );
+    pump.connect(
+        lann_tls_quinn::rpk_client_config(&client_identity, &server_identity.public_key(), ALPN)
+            .expect("client config"),
+        "rpk.invalid",
+    );
+
+    handshake_to_connected(&mut pump);
+
+    let (_, conn) = pump.server_conn.as_mut().unwrap();
+    assert_eq!(rpk_peer_key(conn), client_identity.public_key());
+    let (_, conn) = pump.client_conn.as_mut().unwrap();
+    assert_eq!(rpk_peer_key(conn), server_identity.public_key());
+}
+
+/// A wrong pin must not produce a connection: the client rejects the
+/// server's key during the handshake.
+#[test]
+fn rpk_wrong_pin_fails() {
+    let server_identity =
+        RpkIdentity::from_pkcs8_der(LEAF_KEY_P8).expect("testdata leaf key is Ed25519");
+    let client_identity =
+        RpkIdentity::from_pkcs8_der(CLIENT_KEY_P8).expect("testdata client key is Ed25519");
+
+    let mut wrong_key = server_identity.public_key();
+    wrong_key[0] ^= 1;
+
+    let mut pump = Pump::new(
+        lann_tls_quinn::rpk_server_config(&server_identity, ALPN).expect("server config"),
+    );
+    pump.connect(
+        lann_tls_quinn::rpk_client_config(&client_identity, &wrong_key, ALPN)
+            .expect("client config"),
+        "rpk.invalid",
+    );
+
+    let mut client_failed = false;
+    pump.run_until(|p| {
+        if let Some((_, conn)) = p.client_conn.as_mut() {
+            for event in drain_events(conn) {
+                match event {
+                    Event::ConnectionLost { .. } => client_failed = true,
+                    Event::Connected => panic!("connection must not complete under a wrong pin"),
+                    _ => {}
+                }
+            }
+        }
+        client_failed
+    });
 }

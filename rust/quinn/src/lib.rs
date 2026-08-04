@@ -134,6 +134,63 @@ impl fmt::Debug for StaticResolver {
     }
 }
 
+/// A QUIC-ready raw-public-key client config (RFC 7250): mutually
+/// authenticated, pinning the server to `expected_server_key`.
+///
+/// See [`lann_tls::rpk`] for the trust contract — a verified connection
+/// authenticates key possession, nothing else. `alpn` is required
+/// (RFC 9001 §8.1).
+pub fn rpk_client_config(
+    identity: &lann_tls_profile::RpkIdentity,
+    expected_server_key: &[u8; 32],
+    alpn: &[&[u8]],
+) -> Result<rustls::ClientConfig, rustls::Error> {
+    use rustls::client::AlwaysResolvesClientRawPublicKeys;
+
+    let provider = provider();
+    let algorithms = provider.signature_verification_algorithms;
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .expect("the profile provider supports TLS 1.3")
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(lann_tls::rpk::RpkServerVerifier::new(
+            expected_server_key,
+            algorithms,
+        )))
+        .with_client_cert_resolver(Arc::new(AlwaysResolvesClientRawPublicKeys::new(Arc::new(
+            lann_tls::rpk::certified_key(identity)?,
+        ))));
+    config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
+    config.enable_early_data = true;
+    Ok(config)
+}
+
+/// A QUIC-ready raw-public-key server config (RFC 7250): mutually
+/// authenticated, admitting any client that proves an Ed25519 key.
+///
+/// Read the authenticated client key with [`lann_tls::rpk::peer_public_key`]
+/// after the handshake; admission is not authorization. `alpn` is
+/// required (RFC 9001 §8.1).
+pub fn rpk_server_config(
+    identity: &lann_tls_profile::RpkIdentity,
+    alpn: &[&[u8]],
+) -> Result<rustls::ServerConfig, rustls::Error> {
+    use rustls::server::AlwaysResolvesServerRawPublicKeys;
+
+    let provider = provider();
+    let algorithms = provider.signature_verification_algorithms;
+    let mut config = rustls::ServerConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .expect("the profile provider supports TLS 1.3")
+        .with_client_cert_verifier(Arc::new(lann_tls::rpk::RpkClientVerifier::new(algorithms)))
+        .with_cert_resolver(Arc::new(AlwaysResolvesServerRawPublicKeys::new(Arc::new(
+            lann_tls::rpk::certified_key(identity)?,
+        ))));
+    config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
+    config.max_early_data_size = u32::MAX;
+    Ok(config)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

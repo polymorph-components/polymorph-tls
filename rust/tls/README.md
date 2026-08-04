@@ -80,6 +80,16 @@ crate's cfg dispatch, and where possible by artifact:
 - **Ed25519** (`ed25519-dalek` 3): complete addition laws, no
   per-signature secret nonce, constant-time scalar arithmetic.
 
+## Raw public keys
+
+The `rpk` module carries the mutually authenticated raw-public-key
+posture (RFC 7250) — the peer-to-peer trust model where a bare Ed25519
+key is the peer's identity. Its trust contract, timing notes, and
+interoperability limits are in the module documentation and the
+[profile document](../profile/README.md)'s "Raw public keys" section.
+Nothing in it touches the provider: the same suites, groups, and
+verification algorithms serve both trust models.
+
 ## Timing classes and residual assumptions
 
 The classification and its sources are inherited from
