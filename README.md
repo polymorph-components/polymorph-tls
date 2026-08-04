@@ -54,6 +54,12 @@ secret-bearing surfaces walk through it as follows.
 The central ruling: **the algorithm profile is the primary artifact**, and
 it has two deliveries.
 
+A second ruling orders the goals: **the primary goal is a generally-useful
+TLS interface and implementation.** QUIC over `wasi:sockets` is the
+motivating consumer, and quinn compatibility is a real but secondary
+requirement — delivered as a separate compatibility layer and used as the
+validation vehicle, never part of the core library.
+
 - **The profile** fixes the algorithm policy once: ChaCha20-Poly1305
   preferred; fixsliced `TLS_AES_128_GCM_SHA256` present for conformance,
   never preferred; X25519 and P-256 key exchange; the full
@@ -76,9 +82,10 @@ it has two deliveries.
   no constructor accepts class-D private key material; signing is only
   ever a caller-supplied trait object.
 
-The implementation path is assembly, not invention: `quinn-proto` (sans-IO
-QUIC) + rustls with a pure-RustCrypto `CryptoProvider`, driven over
-`wasi:sockets` UDP by an adapter this repository owns.
+The implementation path is assembly, not invention: rustls with a pure-
+RustCrypto `CryptoProvider` at the core; for the QUIC leg, `quinn-proto`
+(sans-IO QUIC) driven over `wasi:sockets` UDP by an adapter this repository
+owns.
 
 ## Performance posture
 
