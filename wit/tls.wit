@@ -1,0 +1,176 @@
+package lann:tls@0.1.0;
+
+/// Shared types for TLS connections.
+interface types {
+    /// A DER-encoded X.509 certificate.
+    type certificate-der = list<u8>;
+
+    /// An error from the TLS implementation.
+    ///
+    /// The rendering is for diagnostics only. Do not parse it: peers
+    /// control parts of its content, and its format is not stable.
+    resource error {
+        /// Renders the error for logs and diagnostics.
+        to-debug-string: func() -> string;
+    }
+
+    /// Facts established by a completed handshake.
+    record connection-info {
+        /// The negotiated ALPN protocol, if the peer negotiated one.
+        alpn-protocol: option<list<u8>>,
+        /// The server name the client requested (SNI). Set on accepted
+        /// connections; `none` on initiated connections.
+        server-name: option<string>,
+    }
+}
+
+/// Outgoing (client) TLS connections.
+///
+/// See the package README's "Connection lifecycle" section for the shared
+/// transform-pair contract: `send` and `receive` are each called exactly
+/// once, before the handshake method.
+interface client {
+    use types.{certificate-der, connection-info, error};
+
+    /// A single outgoing TLS connection.
+    ///
+    /// Algorithm policy is fixed by the implementation and is not
+    /// configurable here; see the package README's "Algorithm profile"
+    /// section.
+    ///
+    /// Security:
+    /// - The peer is verified against `roots`. There is no way to skip
+    ///   verification.
+    /// - Clients send no certificate and hold no private key.
+    resource connector {
+        /// Creates a connector trusting the given root certificates.
+        constructor(roots: list<certificate-der>);
+
+        /// Sets up the encryption transform. Application data written to
+        /// `cleartext` is encrypted and emitted on the returned stream,
+        /// which feeds the transport's transmit side. Closing `cleartext`
+        /// sends a TLS `close_notify` and then closes the returned
+        /// stream. The future resolves when this direction finishes.
+        send: func(cleartext: stream<u8>) -> tuple<stream<u8>, future<result<_, error>>>;
+
+        /// Sets up the decryption transform. `ciphertext` carries bytes
+        /// from the transport's receive side; decrypted application data
+        /// is emitted on the returned stream. The stream closes when the
+        /// peer closes its write direction; the future distinguishes a
+        /// clean TLS close from truncation or failure.
+        receive: func(ciphertext: stream<u8>) -> tuple<stream<u8>, future<result<_, error>>>;
+
+        /// Runs the TLS 1.3 handshake as `server-name`, offering
+        /// `alpn-protocols` in preference order. Resolves when the
+        /// handshake completes.
+        connect: async func(server-name: string, alpn-protocols: list<list<u8>>) -> result<connection-info, error>;
+    }
+}
+
+/// Incoming (server) TLS connections.
+///
+/// See the package README's "Connection lifecycle" section for the shared
+/// transform-pair contract, and its "Signing policy" section for the
+/// identity postures.
+interface server {
+    use types.{certificate-der, connection-info, error};
+
+    /// A server identity: a certificate chain and the means to sign the
+    /// handshake's CertificateVerify message.
+    ///
+    /// Security:
+    /// - No constructor accepts an ECDSA or RSA private key, in any
+    ///   format. Those keys stay outside this component; see
+    ///   [`delegated`](identity.delegated).
+    resource identity {
+        /// An identity whose Ed25519 key signs inside this component.
+        ///
+        /// `private-key-pkcs8-der` must be a PKCS#8 document holding an
+        /// Ed25519 key. Other key types are rejected, not redirected.
+        /// The certificate chain is leaf first.
+        ed25519: static func(chain: list<certificate-der>, private-key-pkcs8-der: list<u8>) -> result<identity, error>;
+
+        /// An identity whose signatures are produced by the composed
+        /// signer (see the `signer` interface). The private key never
+        /// exists inside this component. Fails if no signer is composed.
+        /// The certificate chain is leaf first.
+        delegated: static func(chain: list<certificate-der>) -> result<identity, error>;
+    }
+
+    /// A single incoming TLS connection.
+    ///
+    /// Algorithm policy is fixed by the implementation and is not
+    /// configurable here; see the package README's "Algorithm profile"
+    /// section.
+    resource acceptor {
+        /// Creates an acceptor presenting `identity`.
+        constructor(identity: borrow<identity>);
+
+        /// As [`connector.send`](client.connector.send), for the server
+        /// side.
+        send: func(cleartext: stream<u8>) -> tuple<stream<u8>, future<result<_, error>>>;
+
+        /// As [`connector.receive`](client.connector.receive), for the
+        /// server side.
+        receive: func(ciphertext: stream<u8>) -> tuple<stream<u8>, future<result<_, error>>>;
+
+        /// Runs the TLS 1.3 handshake, accepting any of
+        /// `alpn-protocols` (in preference order). Resolves when the
+        /// handshake completes.
+        accept: async func(alpn-protocols: list<list<u8>>) -> result<connection-info, error>;
+    }
+}
+
+/// An external signer for the endpoint's own CertificateVerify message.
+///
+/// Implementations hold a TLS server identity's private key — typically
+/// outside the guest entirely (a host provider, an HSM, a key service).
+/// The TLS implementation calls `sign` at most once per handshake.
+///
+/// Security:
+/// - The message is the complete RFC 8446 §4.4.3 CertificateVerify
+///   content: context string, separator, and transcript hash.
+///   Implementations must sign it as given, without constructing or
+///   assuming any other structure.
+/// - Signing must be constant-time with respect to the private key; the
+///   remote-timing attack lineage targets exactly this operation.
+interface signer {
+    /// TLS 1.3 signature schemes a delegated identity may require. The
+    /// scheme is determined by the identity's certificate.
+    enum signature-scheme {
+        ecdsa-secp256r1-sha256,
+        ecdsa-secp384r1-sha384,
+        rsa-pss-rsae-sha256,
+        rsa-pss-rsae-sha384,
+        rsa-pss-rsae-sha512,
+        ed25519,
+    }
+
+    /// Signs `message` with the identity's private key under `scheme`,
+    /// returning the signature in the scheme's TLS wire encoding (RFC
+    /// 8446 §4.2.3). The error string is for diagnostics only.
+    sign: async func(scheme: signature-scheme, message: list<u8>) -> result<list<u8>, string>;
+}
+
+/// The TLS component, in-guest Ed25519 signing posture.
+///
+/// Server identities are limited to [`identity.ed25519`]; delegated
+/// identities fail at construction. See the package README's "Worlds"
+/// section.
+world tls {
+    export types;
+    export client;
+    export server;
+}
+
+/// The TLS component with a composed external signer.
+///
+/// [`identity.delegated`] identities sign through the imported `signer`;
+/// the private key never enters this component. See the package README's
+/// "Worlds" section.
+world tls-delegated {
+    import signer;
+    export types;
+    export client;
+    export server;
+}
