@@ -19,3 +19,8 @@ build-wasm:
 # Loopback QUIC smoke test over wasi:sockets under Wasmtime.
 smoke: build-wasm
     wasmtime run -S inherit-network target/wasm32-wasip2/debug/quic-loopback.wasm
+
+# Binary audit: no table-based AES in the release wasm artifact.
+audit:
+    cargo build -p quic-loopback --target wasm32-wasip2 --release
+    python3 scripts/audit-aes-tables.py target/wasm32-wasip2/release/quic-loopback.wasm
