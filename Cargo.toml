@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/profile", "rust/tls", "rust/quinn"]
+members = ["rust/profile", "rust/tls", "rust/quinn", "rust/quinn-wasi", "examples/quic-loopback"]
 resolver = "2"
 
 [workspace.package]
@@ -19,6 +19,9 @@ ed25519-dalek = { version = "3", default-features = false, features = ["alloc", 
 
 lann-tls = { path = "rust/tls" }
 lann-tls-quinn = { path = "rust/quinn" }
+lann-quinn-wasi = { path = "rust/quinn-wasi" }
+
+wasi = "0.14"
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = "0.9"

@@ -1,0 +1,13 @@
+[package]
+name = "lann-quinn-wasi"
+description = "Drives quinn-proto endpoints over wasi:sockets UDP: batched receive/transmit, wasi:clocks timers, pollable-based waiting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quinn-proto = { workspace = true }
+bytes = { workspace = true }
+
+[target.'cfg(all(target_family = "wasm", target_os = "wasi"))'.dependencies]
+wasi = { workspace = true }
