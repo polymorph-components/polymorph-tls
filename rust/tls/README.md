@@ -34,7 +34,10 @@ rather than an in-repo provider. Audit findings behind that decision:
 
 - **Distribution**: no usable crates.io release exists (`0.0.2-alpha`,
   April 2024, rustls `^0.23`); the git repository is actively maintained.
-  The dependency is a git reference, pinned by `Cargo.lock`.
+  The dependency is a git reference pinned to the audited revision in
+  `Cargo.toml` — a lockfile alone would not bind consumers of these
+  crates, which resolve the git dependency from the manifest. Bumping the
+  revision is a re-audit event.
 - **QUIC**: upstream's QUIC support is an unwired stub — every suite
   carries `quic: None` and its `quic.rs` bodies are `todo!()`. The QUIC
   packet-protection layer therefore lives in this repository

@@ -987,7 +987,7 @@ dependencies = [
 [[package]]
 name = "rustls-rustcrypto"
 version = "0.0.2-alpha"
-source = "git+https://github.com/RustCrypto/rustls-rustcrypto#7b44a2de957b6596d267a920d3aec0d4137defb1"
+source = "git+https://github.com/RustCrypto/rustls-rustcrypto?rev=7b44a2de957b6596d267a920d3aec0d4137defb1#7b44a2de957b6596d267a920d3aec0d4137defb1"
 dependencies = [
  "aead",
  "aes-gcm",
