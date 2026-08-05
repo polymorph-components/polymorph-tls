@@ -14,6 +14,9 @@ members = [
     "experimental/tls-virt/virtualizer",
     "experimental/tls-virt/demo",
 ]
+# A native wasmtime embedding: it cannot build for the workspace's
+# wasm32-wasip2 target, so it stands alone with its own lockfile.
+exclude = ["experimental/tls-virt-host"]
 resolver = "2"
 
 [workspace.package]

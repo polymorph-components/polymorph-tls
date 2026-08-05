@@ -43,7 +43,10 @@ design record.
 - `experimental/` — prototypes, per its README's contract (no
   stability, not in the default gates): `tls-virt` is a `wasi:sockets`
   virtualizer adding transparent TLS via the composed `lann:tls`
-  client, with its own demo, composition, and smoke script.
+  client, with its own demo, composition, and smoke script;
+  `tls-virt-host` is the same interposition as a wasmtime embedding
+  wrapping wasmtime-wasi's sockets provider (workspace-excluded, own
+  lockfile).
 - `scripts/` — audit helper and the interop harnesses (with their Go
   peer in `scripts/interop/peer`).
 

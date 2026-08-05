@@ -73,6 +73,12 @@ smoke-tls-webcrypto:
 smoke-tls-virt: build-wasm
     experimental/tls-virt/smoke.sh
 
+# The experimental tls-virt-host rig: the same demo under the custom
+# wasmtime embedding (host-side wasi:sockets wrapper). On demand; not
+# part of `smoke`. Builds its own excluded crate.
+smoke-tls-virt-host:
+    experimental/tls-virt-host/smoke.sh
+
 # Binary audit: no table-based AES in the release wasm artifact.
 audit:
     cargo build -p quic-loopback --target wasm32-wasip2 --release
