@@ -16,3 +16,4 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-uti
 tokio-rustls = { version = "0.26", default-features = false }
 wasmtime = "47"
 wasmtime-wasi = { version = "47", features = ["p3"] }
+wasmtime-wasi-io = "47"

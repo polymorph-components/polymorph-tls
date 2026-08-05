@@ -2269,6 +2269,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "tls-virt-demo-p2"
+version = "0.1.0"
+
+[[package]]
 name = "tls-virt-guest"
 version = "0.1.0"
 dependencies = [
@@ -2290,6 +2294,7 @@ dependencies = [
  "tokio-rustls",
  "wasmtime",
  "wasmtime-wasi",
+ "wasmtime-wasi-io",
 ]
 
 [[package]]

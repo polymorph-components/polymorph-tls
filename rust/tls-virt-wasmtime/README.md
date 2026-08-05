@@ -12,7 +12,11 @@ handle-address design live in [`tls-virt-common`](../tls-virt-common).
 
 The same demo component (`examples/tls-virt-demo`) runs unmodified
 against both deliveries: they interpose on the same surface from
-opposite sides of the host boundary.
+opposite sides of the host boundary. This delivery additionally
+interposes `wasi:sockets@0.2.x`, which the guest delivery does not: a
+plain `std::net` Rust guest (`examples/tls-virt-demo-p2`) — std on
+wasm32-wasip2 sits on the 0.2 interfaces — tunnels the same way, with
+no wasm-specific code at all.
 
 The tunnel's TLS runs the `lann-tls` profile configs natively
 (tokio-rustls carrying `lann_tls::client_config`), so the algorithm
@@ -42,6 +46,23 @@ offered cipher suites are the profile's, verbatim.
   half; the receive stream is a `StreamProducer` reading the TLS read
   half; the direction verdicts are oneshot-backed `FutureReader`s —
   the same shapes as wasmtime-wasi's own TCP implementation.
+- **The 0.2 generation is wrapped separately** (`src/p2.rs`), against
+  the same handle table: only `sockets/tcp` and
+  `sockets/ip-name-lookup` carry custom implementations (`udp`,
+  `network`, `instance-network`, and the create-socket interfaces are
+  registered stock). The 0.2 shapes differ where it matters:
+  `start`/`finish-connect` drive the handshake as a polled background
+  task with a custom pollable; the data path is `wasi:io` streams —
+  the receive stream pulls from the TLS read half inside
+  `Pollable::ready`, while the send direction needs a resident writer
+  task, because a 0.2 guest may `check-write`/`write` and never poll
+  the stream again; `shutdown(send)` and output-stream drop both
+  become close_notify; and name lookup drains the delegated
+  `resolve-address-stream` through the wrapped resource before
+  yielding the one handle address. Unlike the 0.3 tunnel path, 0.2
+  tunnel connects **do** pass the sandbox address check against the
+  real destination: the 0.2 `network` resource exposes
+  `check_socket_addr` publicly.
 
 ## Findings (contrasts with the guest virtualizer)
 
@@ -78,12 +99,11 @@ offered cipher suites are the profile's, verbatim.
 Trust roots are the repository's baked test fixtures
 (`rust/quinn/tests/testdata/ca.der`), ALPN is not offered, socket
 options on a tunneled socket reach the parked placeholder socket rather
-than the tunnel's transport (as does `get-address-family`), the 0.2.x
-sockets registered by `p2::add_to_linker_async` are not wrapped (a
-guest importing them would bypass the tunnel; the demo imports only
-0.3.0 sockets), and TLS failures surface as `connection-reset`/stream
-closure with detail on stderr only. See issue #16 for the
-productionization gaps.
+than the tunnel's transport (as does `get-address-family`), and TLS
+failures surface as `connection-reset`/stream closure with detail on
+stderr only. On the 0.3 path, tunnel connects bypass the sandbox
+address check (see the findings above); the 0.2 path enforces it. See
+issue #16 for the productionization gaps.
 
 ## Running
 
@@ -91,9 +111,10 @@ productionization gaps.
 just smoke-tls-virt-wasmtime
 ```
 
-Builds the demo component and this embedding, then runs two legs: the
-tunnel leg against `openssl s_server -rev` (gates: handle address
-returned, reversed echo with clean closes, TLS 1.3 handshake with
-exactly the profile's cipher suites) and a passthrough leg against a
-plain-TCP reverse echo (gates: real addresses returned, the whole
-connection delegated to wasmtime-wasi).
+Builds the demo components and this embedding, then runs a tunnel leg
+and a passthrough leg per sockets generation: tunnel legs against
+`openssl s_server -rev` (gates: handle address returned, reversed echo
+with clean closes, TLS 1.3 handshake with exactly the profile's cipher
+suites), passthrough legs against a plain-TCP reverse echo (gates: real
+addresses returned, the whole connection delegated to wasmtime-wasi).
+The 0.2 legs run the `std::net` guest.

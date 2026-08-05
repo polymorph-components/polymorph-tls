@@ -50,8 +50,10 @@ design record.
   the shim adapting a `lann:webcrypto` provider to `lann:tls/signer`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
-- `examples/tls-virt-demo` — the plain-TCP demo guest both tls-virt
-  rigs run unmodified.
+- `examples/tls-virt-demo`, `examples/tls-virt-demo-p2` — the plain-TCP
+  demo guests: the wasip3 app both tls-virt rigs run unmodified, and
+  the `std::net` app (`wasi:sockets@0.2.x` via Rust std) for the
+  wasmtime delivery's 0.2 interposition.
 - `scripts/` — audit helper, the interop harnesses (with their Go
   peer in `scripts/interop/peer`), and the tls-virt smoke harnesses.
 
@@ -61,7 +63,7 @@ design record.
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
 | `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `lann:webcrypto` provider |
-| `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider (handle-address and profile-cipher-suite gates, plus a plain-TCP passthrough-delegation leg) |
+| `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider on both sockets generations — wasip3 and `std::net`/0.2 guests — with handle-address and profile-cipher-suite gates plus plain-TCP passthrough-delegation legs |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 

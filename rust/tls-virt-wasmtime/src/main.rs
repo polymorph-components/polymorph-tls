@@ -8,8 +8,11 @@
 //! connection and drive a TLS 1.3 handshake (SNI + verification against
 //! baked fixture roots), and the guest's bytes tunnel through TLS it
 //! cannot observe — implemented by wrapping wasmtime-wasi's
-//! `wasi:sockets@0.3.0` implementation instead of composing a wasm
-//! component in front of it.
+//! `wasi:sockets` implementations instead of composing a wasm component
+//! in front of the guest. Both sockets generations are interposed:
+//! `wasi:sockets@0.3.0` in this module, `wasi:sockets@0.2.x` in `p2` —
+//! the latter covering plain `std::net` Rust guests, whose networking
+//! sits on the 0.2 interfaces.
 //!
 //! The provider implements wasmtime-wasi's generated sockets host
 //! traits with its own store projection. Every operation on a
@@ -28,6 +31,8 @@
 //! Runs the component's `wasi:cli/run@0.3.0` export with stdio
 //! inherited, network inherited, and name lookup allowed. Limits are
 //! recorded in README.md.
+
+mod p2;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
@@ -64,11 +69,11 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 const ROOT: &[u8] = include_bytes!("../../quinn/tests/testdata/ca.der");
 
 /// Read hop size for the tunnel's receive producer.
-const CHUNK: usize = 16 * 1024;
+pub(crate) const CHUNK: usize = 16 * 1024;
 
 type TlsStream = tokio_rustls::client::TlsStream<TcpStream>;
-type TlsReadHalf = tokio::io::ReadHalf<TlsStream>;
-type TlsWriteHalf = tokio::io::WriteHalf<TlsStream>;
+pub(crate) type TlsReadHalf = tokio::io::ReadHalf<TlsStream>;
+pub(crate) type TlsWriteHalf = tokio::io::WriteHalf<TlsStream>;
 
 // --- store data and projections ---
 
@@ -87,19 +92,31 @@ impl WasiView for Ctx {
     }
 }
 
+impl wasmtime_wasi_io::IoView for Ctx {
+    fn table(&mut self) -> &mut ResourceTable {
+        &mut self.table
+    }
+}
+
 /// The virtualizing provider's own state.
-struct VirtCtx {
+pub(crate) struct VirtCtx {
     /// The handle-address table (`tls-virt-common`).
-    names: HandleTable,
-    /// Tunnels, keyed by the socket resource's table index. A socket
-    /// with an entry here is a tunnel; every other socket delegates.
-    tunnels: HashMap<u32, Tunnel>,
+    pub(crate) names: HandleTable,
+    /// 0.3 tunnels, keyed by the socket resource's table index. A
+    /// socket with an entry here is a tunnel; every other socket
+    /// delegates.
+    pub(crate) tunnels: HashMap<u32, Tunnel>,
+    /// 0.2 tunnels, keyed the same way (see `p2`).
+    pub(crate) p2_tunnels: HashMap<u32, p2::P2Tunnel>,
+    /// 0.2 suffix-opted resolutions being drained, keyed by the
+    /// delegated resolve-stream resource's table index (see `p2`).
+    pub(crate) p2_resolves: HashMap<u32, p2::P2Resolve>,
     /// TLS 1.3 client configuration: the `lann-tls` profile configs
     /// over the baked fixture root.
-    connector: TlsConnector,
+    pub(crate) connector: TlsConnector,
     /// Runtime handle for the close_notify shutdown task (spawned from
     /// a `Drop` impl, which cannot await).
-    runtime: tokio::runtime::Handle,
+    pub(crate) runtime: tokio::runtime::Handle,
 }
 
 struct Tunnel {
@@ -124,6 +141,8 @@ impl VirtCtx {
         Ok(Self {
             names: HandleTable::new(),
             tunnels: HashMap::new(),
+            p2_tunnels: HashMap::new(),
+            p2_resolves: HashMap::new(),
             connector: TlsConnector::from(Arc::new(config)),
             runtime: tokio::runtime::Handle::current(),
         })
@@ -149,9 +168,9 @@ impl VirtCtx {
 
 /// The provider's store projection: its own state plus wasmtime-wasi's
 /// sockets view for delegation.
-struct VirtView<'a> {
-    virt: &'a mut VirtCtx,
-    sockets: WasiSocketsCtxView<'a>,
+pub(crate) struct VirtView<'a> {
+    pub(crate) virt: &'a mut VirtCtx,
+    pub(crate) sockets: WasiSocketsCtxView<'a>,
 }
 
 /// `HasData` marker for the provider (the `D` in the generated
@@ -321,6 +340,7 @@ impl HostTcpSocket for VirtView<'_> {
 
     fn drop(&mut self, socket: Resource<TcpSocket>) -> wasmtime::Result<()> {
         self.virt.tunnels.remove(&socket.rep());
+        self.virt.p2_tunnels.remove(&socket.rep());
         HostTcpSocket::drop(&mut self.sockets, socket)
     }
 }
@@ -762,6 +782,51 @@ impl<D> StreamProducer<D> for TlsReceiveProducer {
 
 // --- driver ---
 
+/// Registers the 0.2.x baseline (the guest std's imports), with the
+/// sockets interfaces interposed: `tcp` and `ip-name-lookup` are this
+/// provider's (see `p2`); `udp`, `network`, `instance-network`, and the
+/// create-socket interfaces are wasmtime-wasi's stock implementations.
+/// Mirrors `wasmtime_wasi::p2::add_to_linker_async` otherwise.
+fn add_p2_to_linker(l: &mut Linker<Ctx>) -> Result<()> {
+    use wasmtime_wasi::cli::{WasiCli, WasiCliView as _};
+    use wasmtime_wasi::clocks::{WasiClocks, WasiClocksView as _};
+    use wasmtime_wasi::filesystem::{WasiFilesystem, WasiFilesystemView as _};
+    use wasmtime_wasi::p2::bindings::{cli, clocks, filesystem, random, sockets, LinkOptions};
+    use wasmtime_wasi::random::{WasiRandom, WasiRandomView as _};
+    use wasmtime_wasi::sockets::WasiSocketsView as _;
+
+    wasmtime_wasi_io::add_to_linker_async(l)?;
+
+    clocks::wall_clock::add_to_linker::<Ctx, WasiClocks>(l, Ctx::clocks)?;
+    clocks::monotonic_clock::add_to_linker::<Ctx, WasiClocks>(l, Ctx::clocks)?;
+    filesystem::types::add_to_linker::<Ctx, WasiFilesystem>(l, Ctx::filesystem)?;
+    filesystem::preopens::add_to_linker::<Ctx, WasiFilesystem>(l, Ctx::filesystem)?;
+    random::random::add_to_linker::<Ctx, WasiRandom>(l, Ctx::random)?;
+    random::insecure::add_to_linker::<Ctx, WasiRandom>(l, Ctx::random)?;
+    random::insecure_seed::add_to_linker::<Ctx, WasiRandom>(l, Ctx::random)?;
+    cli::exit::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::environment::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::stdin::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::stdout::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::stderr::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::terminal_input::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::terminal_output::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::terminal_stdin::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::terminal_stdout::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+    cli::terminal_stderr::add_to_linker::<Ctx, WasiCli>(l, Ctx::cli)?;
+
+    let options = LinkOptions::default();
+    sockets::network::add_to_linker::<Ctx, WasiSockets>(l, &(&options).into(), Ctx::sockets)?;
+    sockets::instance_network::add_to_linker::<Ctx, WasiSockets>(l, Ctx::sockets)?;
+    sockets::tcp_create_socket::add_to_linker::<Ctx, WasiSockets>(l, Ctx::sockets)?;
+    sockets::udp_create_socket::add_to_linker::<Ctx, WasiSockets>(l, Ctx::sockets)?;
+    sockets::udp::add_to_linker::<Ctx, WasiSockets>(l, Ctx::sockets)?;
+
+    sockets::tcp::add_to_linker::<Ctx, VirtSockets>(l, virt_view)?;
+    sockets::ip_name_lookup::add_to_linker::<Ctx, VirtSockets>(l, virt_view)?;
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -781,9 +846,7 @@ async fn main() -> Result<()> {
         Component::from_file(&engine, component_path).context("failed to load component")?;
 
     let mut linker = Linker::<Ctx>::new(&engine);
-    // The 0.2.x baseline (the guest std's imports). Note this includes
-    // wasmtime-wasi's p2 sockets unwrapped; see README.md.
-    wasmtime_wasi::p2::add_to_linker_async(&mut linker)?;
+    add_p2_to_linker(&mut linker)?;
     // The p3 interfaces: everything stock except sockets, which is ours.
     wasmtime_wasi::p3::cli::add_to_linker(&mut linker)?;
     wasmtime_wasi::p3::clocks::add_to_linker(&mut linker)?;
@@ -806,16 +869,40 @@ async fn main() -> Result<()> {
             virt: VirtCtx::new()?,
         },
     );
-    let command = Command::instantiate_async(&mut store, &component, &linker)
+    // The guest picks its world by its exports: a 0.3 command runs
+    // under the concurrent driver, a 0.2 command (e.g. a plain
+    // `std::net` Rust binary) under the classic async driver.
+    if component
+        .get_export_index(None, "wasi:cli/run@0.3.0")
+        .is_some()
+    {
+        let command = Command::instantiate_async(&mut store, &component, &linker)
+            .await
+            .context("failed to instantiate `wasi:cli/command` (0.3)")?;
+        let result = store
+            .run_concurrent(async move |store| command.wasi_cli_run().call_run(store).await)
+            .await
+            .context("failed to run the component")?
+            .context("guest trapped")?;
+        if result.is_err() {
+            std::process::exit(1);
+        }
+    } else {
+        let command = wasmtime_wasi::p2::bindings::Command::instantiate_async(
+            &mut store, &component, &linker,
+        )
         .await
-        .context("failed to instantiate `wasi:cli/command`")?;
-    let result = store
-        .run_concurrent(async move |store| command.wasi_cli_run().call_run(store).await)
-        .await
-        .context("failed to run the component")?
-        .context("guest trapped")?;
-    if result.is_err() {
-        std::process::exit(1);
+        .context("failed to instantiate `wasi:cli/command` (0.2)")?;
+        match command.wasi_cli_run().call_run(&mut store).await {
+            Ok(Ok(())) => {}
+            Ok(Err(())) => std::process::exit(1),
+            Err(e) => {
+                if let Some(exit) = e.downcast_ref::<wasmtime_wasi::I32Exit>() {
+                    std::process::exit(exit.0);
+                }
+                return Err(e).context("guest trapped");
+            }
+        }
     }
     Ok(())
 }
