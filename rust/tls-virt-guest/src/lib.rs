@@ -1,10 +1,10 @@
 //! `wasi:sockets` virtualizer component: transparent TLS tunneling.
 //!
 //! The guest delivery of the tls-virt scheme (`tls-virt-common`).
-//! Exports a structural copy of `wasi:sockets/types` and
-//! `wasi:sockets/ip-name-lookup` (under the `virt:sockets` package name;
-//! see world.wit), backed by the host's implementations of the same
-//! interfaces plus the composed `lann:tls` client:
+//! Imports and exports the same `wasi:sockets/types` and
+//! `wasi:sockets/ip-name-lookup` interfaces — the exports face the
+//! composed application, the imports face the host — backed by the
+//! host's implementations plus the composed `lann:tls` client:
 //!
 //! - Resolving a name under the `.tls-virt.alt` suffix resolves the real
 //!   name via the host, stores the destination in a handle table, and
@@ -32,42 +32,25 @@ use futures::channel::oneshot;
 use tls_virt_common::{strip_suffix, Entry, HandleTable};
 use wit_bindgen::{FutureReader, StreamReader, StreamResult, StreamWriter};
 
-/// The host-facing bindings (imports only). Generated separately from the
-/// exports: one mixed world trips wit-bindgen 0.60's structural
-/// deduplication of future/stream payload vtables, which folds the
-/// export-side `future<result<_, error-code>>` payload onto the
-/// import-side one and leaves the export-side Rust type without a
-/// `FuturePayload` impl (see README.md). Two invocations of the same
-/// wit-bindgen crate share one runtime, so values flow between them.
-mod host_bindings {
-    wit_bindgen::generate!({
-        path: "wit",
-        world: "virtualizer-imports",
-        generate_all,
-    });
-}
+// One `generate!` over the mixed world, with structurally equal types
+// merged: the exported copy's types are aliases of the imported
+// originals, so one payload vtable per equivalence class serves both
+// directions and values cross without conversion (see README.md).
+wit_bindgen::generate!({
+    path: "wit",
+    world: "virtualizer",
+    generate_all,
+    merge_structurally_equal_types: true,
+});
 
-/// The application-facing bindings (exports only).
-mod virt_bindings {
-    wit_bindgen::generate!({
-        path: "wit",
-        world: "virtualizer-exports",
-        generate_all,
-    });
-}
-
-use host_bindings::lann::tls::client::Connector;
-use host_bindings::wasi::sockets::ip_name_lookup as host_lookup;
-use host_bindings::wasi::sockets::types as host;
-use virt_bindings::exports::virt::sockets::ip_name_lookup::{
-    ErrorCode as VLookupErrorCode, Guest as LookupGuest,
+use exports::wasi::sockets::ip_name_lookup::Guest as LookupGuest;
+use exports::wasi::sockets::types::{
+    Guest as TypesGuest, GuestTcpSocket, GuestUdpSocket, TcpSocket as TcpSocketResource,
+    UdpSocket as UdpSocketResource,
 };
-use virt_bindings::exports::virt::sockets::types::{
-    ErrorCode as VErrorCode, Guest as TypesGuest, GuestTcpSocket, GuestUdpSocket,
-    IpAddress as VIpAddress, IpAddressFamily as VFamily, IpSocketAddress as VIpSocketAddress,
-    Ipv4SocketAddress as VIpv4SocketAddress, Ipv6SocketAddress as VIpv6SocketAddress,
-    TcpSocket as VTcpSocketResource, UdpSocket as VUdpSocketResource,
-};
+use lann::tls::client::Connector;
+use wasi::sockets::ip_name_lookup as host_lookup;
+use wasi::sockets::types as host;
 
 /// Trust anchors for tunneled connections (the repository's test CA;
 /// see README.md).
@@ -81,15 +64,15 @@ thread_local! {
     static TABLE: RefCell<HandleTable> = RefCell::new(HandleTable::new());
 }
 
-fn mint_handle(entry: Entry) -> VIpAddress {
+fn mint_handle(entry: Entry) -> host::IpAddress {
     let handle = TABLE.with(|t| t.borrow_mut().mint(entry));
     let s = handle.segments();
-    VIpAddress::Ipv6((s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]))
+    host::IpAddress::Ipv6((s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]))
 }
 
 /// The destination a handle socket-address refers to, if it is one.
-fn lookup_handle(remote: &VIpSocketAddress) -> Option<(String, Vec<IpAddr>, u16)> {
-    let VIpSocketAddress::Ipv6(v6) = remote else {
+fn lookup_handle(remote: &host::IpSocketAddress) -> Option<(String, Vec<IpAddr>, u16)> {
+    let host::IpSocketAddress::Ipv6(v6) = remote else {
         return None;
     };
     let (a, b, c, d, e, f, g, h) = v6.address;
@@ -103,7 +86,7 @@ fn lookup_handle(remote: &VIpSocketAddress) -> Option<(String, Vec<IpAddr>, u16)
 
 struct Component;
 
-virt_bindings::export!(Component with_types_in virt_bindings);
+export!(Component);
 
 impl TypesGuest for Component {
     type TcpSocket = VTcp;
@@ -111,27 +94,22 @@ impl TypesGuest for Component {
 }
 
 impl LookupGuest for Component {
-    async fn resolve_addresses(name: String) -> Result<Vec<VIpAddress>, VLookupErrorCode> {
+    async fn resolve_addresses(
+        name: String,
+    ) -> Result<Vec<host::IpAddress>, host_lookup::ErrorCode> {
         match strip_suffix(&name) {
             Some(real) => {
                 let real = real.to_string();
-                let addrs = host_lookup::resolve_addresses(real.clone())
-                    .await
-                    .map_err(lookup_to_v)?;
+                let addrs = host_lookup::resolve_addresses(real.clone()).await?;
                 if addrs.is_empty() {
-                    return Err(VLookupErrorCode::NameUnresolvable);
+                    return Err(host_lookup::ErrorCode::NameUnresolvable);
                 }
                 Ok(vec![mint_handle(Entry {
                     hostname: real,
                     addrs: addrs.into_iter().map(addr_to_std).collect(),
                 })])
             }
-            None => Ok(host_lookup::resolve_addresses(name)
-                .await
-                .map_err(lookup_to_v)?
-                .into_iter()
-                .map(addr_to_v)
-                .collect()),
+            None => host_lookup::resolve_addresses(name).await,
         }
     }
 }
@@ -148,7 +126,7 @@ enum TcpState {
 }
 
 /// A direction verdict in the exported interface's terms.
-type VVerdict = FutureReader<Result<(), VErrorCode>>;
+type VVerdict = FutureReader<Result<(), host::ErrorCode>>;
 
 /// Task-scope note: every long-lived tunnel task (the transmit splice and
 /// the verdict mappers) is spawned inside `connect`, the one async-lifted
@@ -158,7 +136,7 @@ type VVerdict = FutureReader<Result<(), VErrorCode>>;
 /// hand out endpoints created at connect time.
 struct Tunnel {
     /// The handle address the application dialed, for `get-remote-address`.
-    remote: VIpSocketAddress,
+    remote: host::IpSocketAddress,
     /// The real connection under the tunnel (also serves option queries).
     host: host::TcpSocket,
     /// Delivers the application's transmit stream to the splice task in
@@ -182,61 +160,55 @@ pub struct VTcp {
 }
 
 impl VTcp {
-    fn host_op<T>(&self, op: impl FnOnce(&host::TcpSocket) -> T) -> Result<T, VErrorCode> {
+    fn host_op<T>(&self, op: impl FnOnce(&host::TcpSocket) -> T) -> Result<T, host::ErrorCode> {
         match &*self.state.borrow() {
             TcpState::Host(s) => Ok(op(s)),
             TcpState::Tunnel(t) => Ok(op(&t.host)),
-            TcpState::Busy => Err(VErrorCode::InvalidState),
+            TcpState::Busy => Err(host::ErrorCode::InvalidState),
         }
     }
 }
 
 impl GuestTcpSocket for VTcp {
-    fn create(address_family: VFamily) -> Result<VTcpSocketResource, VErrorCode> {
-        let socket = host::TcpSocket::create(family_to_host(address_family)).map_err(err_to_v)?;
-        Ok(VTcpSocketResource::new(VTcp {
+    fn create(address_family: host::IpAddressFamily) -> Result<TcpSocketResource, host::ErrorCode> {
+        let socket = host::TcpSocket::create(address_family)?;
+        Ok(TcpSocketResource::new(VTcp {
             state: RefCell::new(TcpState::Host(socket)),
         }))
     }
 
-    fn bind(&self, local_address: VIpSocketAddress) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.bind(sockaddr_to_host(local_address)).map_err(err_to_v))?
+    fn bind(&self, local_address: host::IpSocketAddress) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.bind(local_address))?
     }
 
-    async fn connect(&self, remote_address: VIpSocketAddress) -> Result<(), VErrorCode> {
+    async fn connect(&self, remote_address: host::IpSocketAddress) -> Result<(), host::ErrorCode> {
         let Some((hostname, addrs, port)) = lookup_handle(&remote_address) else {
             // Pass-through. Take the socket out so the borrow does not
             // span the await.
             let state = std::mem::replace(&mut *self.state.borrow_mut(), TcpState::Busy);
             let TcpState::Host(socket) = state else {
                 *self.state.borrow_mut() = state;
-                return Err(VErrorCode::InvalidState);
+                return Err(host::ErrorCode::InvalidState);
             };
-            let result = socket
-                .connect(sockaddr_to_host(remote_address))
-                .await
-                .map_err(err_to_v);
+            let result = socket.connect(remote_address).await;
             *self.state.borrow_mut() = TcpState::Host(socket);
             return result;
         };
 
         // Tunnel path: connect the real transport.
         let real_addr =
-            tls_virt_common::pick_addr(&addrs, port).ok_or(VErrorCode::RemoteUnreachable)?;
+            tls_virt_common::pick_addr(&addrs, port).ok_or(host::ErrorCode::RemoteUnreachable)?;
         let real = host::TcpSocket::create(match &real_addr {
             SocketAddr::V4(_) => host::IpAddressFamily::Ipv4,
             SocketAddr::V6(_) => host::IpAddressFamily::Ipv6,
-        })
-        .map_err(err_to_v)?;
-        real.connect(sockaddr_from_std(real_addr))
-            .await
-            .map_err(err_to_v)?;
+        })?;
+        real.connect(sockaddr_from_std(real_addr)).await?;
 
         // Wire the TLS transforms: ciphertext straight onto the socket,
         // application transmit through a pipe (its stream arrives later,
         // at `send`).
         let connector = Connector::new(&ROOTS.iter().map(|r| r.to_vec()).collect::<Vec<_>>());
-        let (pipe_writer, pipe_reader) = host_bindings::wit_stream::new();
+        let (pipe_writer, pipe_reader) = wit_stream::new();
         let (ciphertext_out, send_done) = connector.send(pipe_reader);
         let transport_tx_done = real.send(ciphertext_out);
         let (ciphertext_in, _transport_rx_done) = real.receive();
@@ -250,19 +222,17 @@ impl GuestTcpSocket for VTcp {
                     "tls-virt: TLS handshake with {hostname:?} failed: {}",
                     e.to_debug_string()
                 );
-                VErrorCode::ConnectionReset
+                host::ErrorCode::ConnectionReset
             })?;
 
         // The long-lived tunnel tasks, spawned here so they live in this
         // async export's task scope (see the note on `Tunnel`). This task
         // stays alive until they finish, which is when both TLS
         // directions have ended.
-        let (send_verdict_writer, send_verdict) = virt_bindings::wit_future::new::<
-            Result<(), VErrorCode>,
-        >(|| Err(VErrorCode::Other(None)));
-        let (recv_verdict_writer, recv_verdict) = virt_bindings::wit_future::new::<
-            Result<(), VErrorCode>,
-        >(|| Err(VErrorCode::Other(None)));
+        let (send_verdict_writer, send_verdict) =
+            wit_future::new::<Result<(), host::ErrorCode>>(|| Err(host::ErrorCode::Other(None)));
+        let (recv_verdict_writer, recv_verdict) =
+            wit_future::new::<Result<(), host::ErrorCode>>(|| Err(host::ErrorCode::Other(None)));
         let (app_stream_tx, app_stream_rx) = oneshot::channel::<StreamReader<u8>>();
 
         wit_bindgen::spawn_local(async move {
@@ -277,7 +247,7 @@ impl GuestTcpSocket for VTcp {
             }
             let result = send_done.await.map_err(|e| {
                 eprintln!("tls-virt: send direction failed: {}", e.to_debug_string());
-                VErrorCode::ConnectionReset
+                host::ErrorCode::ConnectionReset
             });
             let _ = send_verdict_writer.write(result).await;
         });
@@ -288,7 +258,7 @@ impl GuestTcpSocket for VTcp {
                     "tls-virt: receive direction failed: {}",
                     e.to_debug_string()
                 );
-                VErrorCode::ConnectionReset
+                host::ErrorCode::ConnectionReset
             });
             let _ = recv_verdict_writer.write(result).await;
         });
@@ -307,7 +277,7 @@ impl GuestTcpSocket for VTcp {
 
     fn send(&self, data: StreamReader<u8>) -> VVerdict {
         match &mut *self.state.borrow_mut() {
-            TcpState::Host(s) => rewrap_verdict(s.send(data)),
+            TcpState::Host(s) => s.send(data),
             TcpState::Tunnel(t) => {
                 let (Some(tx), Some(verdict)) = (t.app_stream_tx.take(), t.send_verdict.take())
                 else {
@@ -322,10 +292,7 @@ impl GuestTcpSocket for VTcp {
 
     fn receive(&self) -> (StreamReader<u8>, VVerdict) {
         match &mut *self.state.borrow_mut() {
-            TcpState::Host(s) => {
-                let (stream, host_done) = s.receive();
-                (stream, rewrap_verdict(host_done))
-            }
+            TcpState::Host(s) => s.receive(),
             TcpState::Tunnel(t) => match t.cleartext.take() {
                 Some(pair) => pair,
                 None => closed_receive(),
@@ -334,24 +301,24 @@ impl GuestTcpSocket for VTcp {
         }
     }
 
-    fn listen(&self) -> Result<StreamReader<VTcpSocketResource>, VErrorCode> {
+    fn listen(&self) -> Result<StreamReader<TcpSocketResource>, host::ErrorCode> {
         // Wrapping each accepted host socket into an exported resource
         // needs a live task, and this sync-lifted export has no task
         // scope to host one (see the note on `Tunnel` and README.md).
         eprintln!("tls-virt: listen is not supported");
-        Err(VErrorCode::NotSupported)
+        Err(host::ErrorCode::NotSupported)
     }
 
-    fn get_local_address(&self) -> Result<VIpSocketAddress, VErrorCode> {
-        self.host_op(|s| s.get_local_address().map(sockaddr_to_v).map_err(err_to_v))?
+    fn get_local_address(&self) -> Result<host::IpSocketAddress, host::ErrorCode> {
+        self.host_op(|s| s.get_local_address())?
     }
 
-    fn get_remote_address(&self) -> Result<VIpSocketAddress, VErrorCode> {
+    fn get_remote_address(&self) -> Result<host::IpSocketAddress, host::ErrorCode> {
         match &*self.state.borrow() {
             // Preserve the illusion: the application dialed the handle.
             TcpState::Tunnel(t) => Ok(t.remote),
-            TcpState::Host(s) => s.get_remote_address().map(sockaddr_to_v).map_err(err_to_v),
-            TcpState::Busy => Err(VErrorCode::InvalidState),
+            TcpState::Host(s) => s.get_remote_address(),
+            TcpState::Busy => Err(host::ErrorCode::InvalidState),
         }
     }
 
@@ -359,92 +326,80 @@ impl GuestTcpSocket for VTcp {
         self.host_op(|s| s.get_is_listening()).unwrap_or(false)
     }
 
-    fn get_address_family(&self) -> VFamily {
+    fn get_address_family(&self) -> host::IpAddressFamily {
         match &*self.state.borrow() {
-            TcpState::Tunnel(_) => VFamily::Ipv6,
-            TcpState::Host(s) => family_to_v(s.get_address_family()),
-            TcpState::Busy => VFamily::Ipv6,
+            TcpState::Tunnel(_) => host::IpAddressFamily::Ipv6,
+            TcpState::Host(s) => s.get_address_family(),
+            TcpState::Busy => host::IpAddressFamily::Ipv6,
         }
     }
 
-    fn set_listen_backlog_size(&self, value: u64) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_listen_backlog_size(value).map_err(err_to_v))?
+    fn set_listen_backlog_size(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_listen_backlog_size(value))?
     }
 
-    fn get_keep_alive_enabled(&self) -> Result<bool, VErrorCode> {
-        self.host_op(|s| s.get_keep_alive_enabled().map_err(err_to_v))?
+    fn get_keep_alive_enabled(&self) -> Result<bool, host::ErrorCode> {
+        self.host_op(|s| s.get_keep_alive_enabled())?
     }
 
-    fn set_keep_alive_enabled(&self, value: bool) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_keep_alive_enabled(value).map_err(err_to_v))?
+    fn set_keep_alive_enabled(&self, value: bool) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_keep_alive_enabled(value))?
     }
 
-    fn get_keep_alive_idle_time(&self) -> Result<u64, VErrorCode> {
-        self.host_op(|s| s.get_keep_alive_idle_time().map_err(err_to_v))?
+    fn get_keep_alive_idle_time(&self) -> Result<u64, host::ErrorCode> {
+        self.host_op(|s| s.get_keep_alive_idle_time())?
     }
 
-    fn set_keep_alive_idle_time(&self, value: u64) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_keep_alive_idle_time(value).map_err(err_to_v))?
+    fn set_keep_alive_idle_time(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_keep_alive_idle_time(value))?
     }
 
-    fn get_keep_alive_interval(&self) -> Result<u64, VErrorCode> {
-        self.host_op(|s| s.get_keep_alive_interval().map_err(err_to_v))?
+    fn get_keep_alive_interval(&self) -> Result<u64, host::ErrorCode> {
+        self.host_op(|s| s.get_keep_alive_interval())?
     }
 
-    fn set_keep_alive_interval(&self, value: u64) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_keep_alive_interval(value).map_err(err_to_v))?
+    fn set_keep_alive_interval(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_keep_alive_interval(value))?
     }
 
-    fn get_keep_alive_count(&self) -> Result<u32, VErrorCode> {
-        self.host_op(|s| s.get_keep_alive_count().map_err(err_to_v))?
+    fn get_keep_alive_count(&self) -> Result<u32, host::ErrorCode> {
+        self.host_op(|s| s.get_keep_alive_count())?
     }
 
-    fn set_keep_alive_count(&self, value: u32) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_keep_alive_count(value).map_err(err_to_v))?
+    fn set_keep_alive_count(&self, value: u32) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_keep_alive_count(value))?
     }
 
-    fn get_hop_limit(&self) -> Result<u8, VErrorCode> {
-        self.host_op(|s| s.get_hop_limit().map_err(err_to_v))?
+    fn get_hop_limit(&self) -> Result<u8, host::ErrorCode> {
+        self.host_op(|s| s.get_hop_limit())?
     }
 
-    fn set_hop_limit(&self, value: u8) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_hop_limit(value).map_err(err_to_v))?
+    fn set_hop_limit(&self, value: u8) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_hop_limit(value))?
     }
 
-    fn get_receive_buffer_size(&self) -> Result<u64, VErrorCode> {
-        self.host_op(|s| s.get_receive_buffer_size().map_err(err_to_v))?
+    fn get_receive_buffer_size(&self) -> Result<u64, host::ErrorCode> {
+        self.host_op(|s| s.get_receive_buffer_size())?
     }
 
-    fn set_receive_buffer_size(&self, value: u64) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_receive_buffer_size(value).map_err(err_to_v))?
+    fn set_receive_buffer_size(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_receive_buffer_size(value))?
     }
 
-    fn get_send_buffer_size(&self) -> Result<u64, VErrorCode> {
-        self.host_op(|s| s.get_send_buffer_size().map_err(err_to_v))?
+    fn get_send_buffer_size(&self) -> Result<u64, host::ErrorCode> {
+        self.host_op(|s| s.get_send_buffer_size())?
     }
 
-    fn set_send_buffer_size(&self, value: u64) -> Result<(), VErrorCode> {
-        self.host_op(|s| s.set_send_buffer_size(value).map_err(err_to_v))?
+    fn set_send_buffer_size(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.host_op(|s| s.set_send_buffer_size(value))?
     }
-}
-
-/// Reissues a host-side transport verdict as an export-side one, by
-/// handle. The payload types are structural byte-copies of one WIT type,
-/// so the transfer type-checks at the boundary; this component never
-/// reads the future, it only passes it out.
-fn rewrap_verdict(host: FutureReader<Result<(), host::ErrorCode>>) -> VVerdict {
-    use virt_bindings::wit_future::FuturePayload;
-    // SAFETY: `take_handle` yields ownership of a live future handle, and
-    // the vtable's wire representation for the two payload types is
-    // identical.
-    unsafe { FutureReader::new(host.take_handle(), <Result<(), VErrorCode>>::VTABLE) }
 }
 
 /// A verdict already resolved to `err(invalid-state)`: the writer drops
 /// unused, so the reader observes the default value.
 fn invalid_state_verdict() -> VVerdict {
     let (writer, reader) =
-        virt_bindings::wit_future::new::<Result<(), VErrorCode>>(|| Err(VErrorCode::InvalidState));
+        wit_future::new::<Result<(), host::ErrorCode>>(|| Err(host::ErrorCode::InvalidState));
     drop(writer);
     reader
 }
@@ -452,7 +407,7 @@ fn invalid_state_verdict() -> VVerdict {
 /// A receive pair for sockets with nothing to give: an already-closed
 /// stream and an invalid-state verdict.
 fn closed_receive() -> (StreamReader<u8>, VVerdict) {
-    let (stream_writer, stream_reader) = virt_bindings::wit_stream::new::<u8>();
+    let (stream_writer, stream_reader) = wit_stream::new::<u8>();
     drop(stream_writer);
     (stream_reader, invalid_state_verdict())
 }
@@ -481,142 +436,73 @@ pub struct VUdp {
 }
 
 impl GuestUdpSocket for VUdp {
-    fn create(address_family: VFamily) -> Result<VUdpSocketResource, VErrorCode> {
-        let socket = host::UdpSocket::create(family_to_host(address_family)).map_err(err_to_v)?;
-        Ok(VUdpSocketResource::new(VUdp { inner: socket }))
+    fn create(address_family: host::IpAddressFamily) -> Result<UdpSocketResource, host::ErrorCode> {
+        let socket = host::UdpSocket::create(address_family)?;
+        Ok(UdpSocketResource::new(VUdp { inner: socket }))
     }
 
-    fn bind(&self, local_address: VIpSocketAddress) -> Result<(), VErrorCode> {
-        self.inner
-            .bind(sockaddr_to_host(local_address))
-            .map_err(err_to_v)
+    fn bind(&self, local_address: host::IpSocketAddress) -> Result<(), host::ErrorCode> {
+        self.inner.bind(local_address)
     }
 
-    fn connect(&self, remote_address: VIpSocketAddress) -> Result<(), VErrorCode> {
-        self.inner
-            .connect(sockaddr_to_host(remote_address))
-            .map_err(err_to_v)
+    fn connect(&self, remote_address: host::IpSocketAddress) -> Result<(), host::ErrorCode> {
+        self.inner.connect(remote_address)
     }
 
-    fn disconnect(&self) -> Result<(), VErrorCode> {
-        self.inner.disconnect().map_err(err_to_v)
+    fn disconnect(&self) -> Result<(), host::ErrorCode> {
+        self.inner.disconnect()
     }
 
     async fn send(
         &self,
         data: Vec<u8>,
-        remote_address: Option<VIpSocketAddress>,
-    ) -> Result<(), VErrorCode> {
-        self.inner
-            .send(data, remote_address.map(sockaddr_to_host))
-            .await
-            .map_err(err_to_v)
+        remote_address: Option<host::IpSocketAddress>,
+    ) -> Result<(), host::ErrorCode> {
+        self.inner.send(data, remote_address).await
     }
 
-    async fn receive(&self) -> Result<(Vec<u8>, VIpSocketAddress), VErrorCode> {
-        self.inner
-            .receive()
-            .await
-            .map(|(data, addr)| (data, sockaddr_to_v(addr)))
-            .map_err(err_to_v)
+    async fn receive(&self) -> Result<(Vec<u8>, host::IpSocketAddress), host::ErrorCode> {
+        self.inner.receive().await
     }
 
-    fn get_local_address(&self) -> Result<VIpSocketAddress, VErrorCode> {
-        self.inner
-            .get_local_address()
-            .map(sockaddr_to_v)
-            .map_err(err_to_v)
+    fn get_local_address(&self) -> Result<host::IpSocketAddress, host::ErrorCode> {
+        self.inner.get_local_address()
     }
 
-    fn get_remote_address(&self) -> Result<VIpSocketAddress, VErrorCode> {
-        self.inner
-            .get_remote_address()
-            .map(sockaddr_to_v)
-            .map_err(err_to_v)
+    fn get_remote_address(&self) -> Result<host::IpSocketAddress, host::ErrorCode> {
+        self.inner.get_remote_address()
     }
 
-    fn get_address_family(&self) -> VFamily {
-        family_to_v(self.inner.get_address_family())
+    fn get_address_family(&self) -> host::IpAddressFamily {
+        self.inner.get_address_family()
     }
 
-    fn get_unicast_hop_limit(&self) -> Result<u8, VErrorCode> {
-        self.inner.get_unicast_hop_limit().map_err(err_to_v)
+    fn get_unicast_hop_limit(&self) -> Result<u8, host::ErrorCode> {
+        self.inner.get_unicast_hop_limit()
     }
 
-    fn set_unicast_hop_limit(&self, value: u8) -> Result<(), VErrorCode> {
-        self.inner.set_unicast_hop_limit(value).map_err(err_to_v)
+    fn set_unicast_hop_limit(&self, value: u8) -> Result<(), host::ErrorCode> {
+        self.inner.set_unicast_hop_limit(value)
     }
 
-    fn get_receive_buffer_size(&self) -> Result<u64, VErrorCode> {
-        self.inner.get_receive_buffer_size().map_err(err_to_v)
+    fn get_receive_buffer_size(&self) -> Result<u64, host::ErrorCode> {
+        self.inner.get_receive_buffer_size()
     }
 
-    fn set_receive_buffer_size(&self, value: u64) -> Result<(), VErrorCode> {
-        self.inner.set_receive_buffer_size(value).map_err(err_to_v)
+    fn set_receive_buffer_size(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.inner.set_receive_buffer_size(value)
     }
 
-    fn get_send_buffer_size(&self) -> Result<u64, VErrorCode> {
-        self.inner.get_send_buffer_size().map_err(err_to_v)
+    fn get_send_buffer_size(&self) -> Result<u64, host::ErrorCode> {
+        self.inner.get_send_buffer_size()
     }
 
-    fn set_send_buffer_size(&self, value: u64) -> Result<(), VErrorCode> {
-        self.inner.set_send_buffer_size(value).map_err(err_to_v)
+    fn set_send_buffer_size(&self, value: u64) -> Result<(), host::ErrorCode> {
+        self.inner.set_send_buffer_size(value)
     }
 }
 
 // --- type mapping between the imported and exported interfaces ---
-
-fn family_to_host(family: VFamily) -> host::IpAddressFamily {
-    match family {
-        VFamily::Ipv4 => host::IpAddressFamily::Ipv4,
-        VFamily::Ipv6 => host::IpAddressFamily::Ipv6,
-    }
-}
-
-fn family_to_v(family: host::IpAddressFamily) -> VFamily {
-    match family {
-        host::IpAddressFamily::Ipv4 => VFamily::Ipv4,
-        host::IpAddressFamily::Ipv6 => VFamily::Ipv6,
-    }
-}
-
-fn addr_to_v(addr: host::IpAddress) -> VIpAddress {
-    match addr {
-        host::IpAddress::Ipv4(a) => VIpAddress::Ipv4(a),
-        host::IpAddress::Ipv6(a) => VIpAddress::Ipv6(a),
-    }
-}
-
-fn sockaddr_to_host(addr: VIpSocketAddress) -> host::IpSocketAddress {
-    match addr {
-        VIpSocketAddress::Ipv4(v4) => host::IpSocketAddress::Ipv4(host::Ipv4SocketAddress {
-            port: v4.port,
-            address: v4.address,
-        }),
-        VIpSocketAddress::Ipv6(v6) => host::IpSocketAddress::Ipv6(host::Ipv6SocketAddress {
-            port: v6.port,
-            flow_info: v6.flow_info,
-            address: v6.address,
-            scope_id: v6.scope_id,
-        }),
-    }
-}
-
-fn sockaddr_to_v(addr: host::IpSocketAddress) -> VIpSocketAddress {
-    match addr {
-        host::IpSocketAddress::Ipv4(v4) => VIpSocketAddress::Ipv4(VIpv4SocketAddress {
-            port: v4.port,
-            address: v4.address,
-        }),
-        host::IpSocketAddress::Ipv6(v6) => VIpSocketAddress::Ipv6(VIpv6SocketAddress {
-            port: v6.port,
-            flow_info: v6.flow_info,
-            address: v6.address,
-            scope_id: v6.scope_id,
-        }),
-    }
-}
-
 /// A resolved host-side address in the handle table's terms.
 fn addr_to_std(addr: host::IpAddress) -> IpAddr {
     match addr {
@@ -646,40 +532,5 @@ fn sockaddr_from_std(addr: SocketAddr) -> host::IpSocketAddress {
             },
             scope_id: 0,
         }),
-    }
-}
-
-fn err_to_v(code: host::ErrorCode) -> VErrorCode {
-    match code {
-        host::ErrorCode::AccessDenied => VErrorCode::AccessDenied,
-        host::ErrorCode::NotSupported => VErrorCode::NotSupported,
-        host::ErrorCode::InvalidArgument => VErrorCode::InvalidArgument,
-        host::ErrorCode::OutOfMemory => VErrorCode::OutOfMemory,
-        host::ErrorCode::Timeout => VErrorCode::Timeout,
-        host::ErrorCode::InvalidState => VErrorCode::InvalidState,
-        host::ErrorCode::AddressNotBindable => VErrorCode::AddressNotBindable,
-        host::ErrorCode::AddressInUse => VErrorCode::AddressInUse,
-        host::ErrorCode::RemoteUnreachable => VErrorCode::RemoteUnreachable,
-        host::ErrorCode::ConnectionRefused => VErrorCode::ConnectionRefused,
-        host::ErrorCode::ConnectionBroken => VErrorCode::ConnectionBroken,
-        host::ErrorCode::ConnectionReset => VErrorCode::ConnectionReset,
-        host::ErrorCode::ConnectionAborted => VErrorCode::ConnectionAborted,
-        host::ErrorCode::DatagramTooLarge => VErrorCode::DatagramTooLarge,
-        host::ErrorCode::Other(detail) => VErrorCode::Other(detail),
-    }
-}
-
-fn lookup_to_v(code: host_lookup::ErrorCode) -> VLookupErrorCode {
-    match code {
-        host_lookup::ErrorCode::AccessDenied => VLookupErrorCode::AccessDenied,
-        host_lookup::ErrorCode::InvalidArgument => VLookupErrorCode::InvalidArgument,
-        host_lookup::ErrorCode::NameUnresolvable => VLookupErrorCode::NameUnresolvable,
-        host_lookup::ErrorCode::TemporaryResolverFailure => {
-            VLookupErrorCode::TemporaryResolverFailure
-        }
-        host_lookup::ErrorCode::PermanentResolverFailure => {
-            VLookupErrorCode::PermanentResolverFailure
-        }
-        host_lookup::ErrorCode::Other(detail) => VLookupErrorCode::Other(detail),
     }
 }

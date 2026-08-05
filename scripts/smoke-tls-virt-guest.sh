@@ -4,8 +4,10 @@
 # against `openssl s_server -rev` on localhost. The demo speaks plain
 # TCP to a `.tls-virt.alt` name; every byte on the wire is TLS.
 #
-# Gates: the composition satisfies every lann:tls and virt:sockets
-# import; the resolver returned a handle address (the fd00::/8 prefix),
+# Gates: the composition satisfies every lann:tls import (the demo's
+# sockets are wired to the virtualizer by compose.wac, and the composed
+# component's remaining wasi:sockets imports are the virtualizer's own
+# passthrough); the resolver returned a handle address (fd00::/8),
 # so the exchange went through the tunnel, not passthrough; openssl
 # completed a TLS handshake; the demo verified the reversed echo and a
 # clean close in both directions.
@@ -31,7 +33,7 @@ wac compose \
     --dep lann:tls-virt-guest="$WASM/tls_virt_guest.wasm" \
     --dep lann:tls-virt-demo="$WASM/tls_virt_demo.wasm" \
     -o "$COMPOSED" rust/tls-virt-guest/compose.wac
-! wasm-tools component wit "$COMPOSED" | grep -qE 'import (lann:tls|virt:sockets)/'
+! wasm-tools component wit "$COMPOSED" | grep -qE 'import lann:tls/'
 
 log "fixture PKI to PEM"
 openssl x509 -inform der -in "$TESTDATA/leaf.der" -out "$work/leaf.pem"

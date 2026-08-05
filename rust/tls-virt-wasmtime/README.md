@@ -66,11 +66,12 @@ offered cipher suites are the profile's, verbatim.
 
 ## Findings (contrasts with the guest virtualizer)
 
-- **The bindings-level obstacles vanish.** No structural-copy export
-  package, no two-worlds bindgen split (the wit-bindgen payload-vtable
-  dedup defect is a guest-bindings artifact), no conversion helpers:
-  one implementation serves the one interface, and the wrapped
-  implementation's types are the wrapper's types.
+- **The bindings-level concerns vanish.** No type merging to opt into
+  (the guest delivery needs wit-bindgen's
+  `merge_structurally_equal_types` to share types across its import
+  and export directions), no conversion helpers: one implementation
+  serves the one interface, and the wrapped implementation's types are
+  the wrapper's types.
 - **`listen` works by delegation.** Accepted sockets land in the
   *shared* resource table as ordinary wasmtime-wasi sockets, so every
   later operation on them delegates too. The guest delivery's blocker —

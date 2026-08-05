@@ -39,32 +39,31 @@ side. It can.
 Three composition/bindings facts this component established, each load
 bearing for any sockets-shaped virtualizer:
 
-- **Export a renamed structural copy, rewire it in wac.** One component
-  cannot cleanly import and export the same interface for bindings
-  generation, so the exports are a byte-copy of `sockets.wit` under the
-  package name `virt:sockets`. Instance types are structural in the
-  component model: `compose.wac` assigns the virtualizer's
-  `virt:sockets/*` exports to the application's `wasi:sockets/*`
-  imports and the name difference is immaterial, while the
-  virtualizer's own `wasi:sockets/*` imports continue to the host.
+- **Import and export the same interface; wire it in wac.** The
+  component model's non-resource types are structural, so a world that
+  imports and exports the same interfaces is the natural virtualizer
+  shape, and composition needs no renamed interface copy: `compose.wac`
+  assigns the virtualizer's `wasi:sockets/*` exports to the
+  application's imports of the same names by explicit instance access,
+  while the virtualizer's own imports continue to the host. (An earlier
+  iteration exported a byte-copied `virt:sockets` package on the belief
+  that same-name worlds could not be generated or composed; both halves
+  of that belief were wrong.)
 
-- **Mixed import/export worlds trip a wit-bindgen 0.60 defect; generate
-  the directions separately.** wit-bindgen deduplicates `future`/
-  `stream` payload vtables by *structural* type equality across the
-  whole world (`get_representative_type`, a union-find in
-  `wit-bindgen-core`'s type information). With `wasi:sockets` imported
-  and its structural copy exported, the export-side
-  `future<result<_, error-code>>` payload is folded onto the
-  import-side representative, and its distinct Rust type
-  (`exports::…::ErrorCode`) never receives a `FuturePayload` impl —
-  `wit_future::new` for the export side then fails to compile. Only
-  nominal types (resources) escape the folding. The generator's
-  assumption that "structurally equal types resolve to the same Rust
-  type" is false across directions. Splitting the world into an
-  imports-only and an exports-only world, with one `generate!`
-  invocation each, keeps the payload maps separate; both invocations
-  share one runtime, so handles flow freely between them. Tracked for
-  upstream reporting in issue #15.
+- **Share types across directions with
+  `merge_structurally_equal_types`.** By default wit-bindgen generates
+  distinct Rust types for the import and export sides of structurally
+  identical interfaces, but deduplicates `future`/`stream` payload
+  vtables by structural equivalence class — so the export side's
+  payload types end up without `FuturePayload`/`StreamPayload` impls
+  and cannot be constructed. `merge_structurally_equal_types: true` is
+  the intended pairing: one Rust type per equivalence class (the rest
+  become aliases), one payload vtable per class, and values cross
+  directions with no conversion code at all — this crate carries no
+  error or address mapping helpers. Only nominal types (resources)
+  stay distinct, as they must. (An earlier iteration worked around the
+  default with two `generate!` invocations over split import-only and
+  export-only worlds; the option makes that unnecessary.)
 
 - **Only async-lifted exports have a task scope; structure the
   virtualizer around `connect`.** wit-bindgen spawns are polled by the
@@ -77,9 +76,8 @@ bearing for any sockets-shaped virtualizer:
   exports only hand out endpoints minted at connect time, and the
   sync-export error paths use writer-drop defaults
   (`wit_future::new(default)`) instead of tasks. Two consequences:
-  - Pass-through transport verdicts are reissued **by handle**
-    (`take_handle` + rewrap): legal because the two payload types are
-    structurally one WIT type, and task-free.
+  - Pass-through transport verdicts, like the ciphertext streams, pass
+    **by handle** — with merged types they are simply returned as-is.
   - `listen` is **not supported**: each accepted host socket would need
     wrapping into an exported resource (resources are nominal, so no
     by-handle pass-through), and that wrapper needs a resident task no
