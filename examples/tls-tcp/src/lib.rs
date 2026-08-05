@@ -1,4 +1,4 @@
-//! Real-transport demo for the `lann:tls` component: TLS over actual
+//! Real-transport demo for the `polymorph:tls` component: TLS over actual
 //! `wasi:sockets` TCP (`wasi:sockets@0.3`).
 //!
 //! Where `tls-loopback` wires the component's streams to itself in
@@ -34,17 +34,17 @@ wit_bindgen::generate!({
     inline: "
         package inline:app;
         world app {
-            import lann:tls/types@0.1.0;
-            import lann:tls/client@0.1.0;
-            import lann:tls/server@0.1.0;
+            import polymorph:tls/types@0.1.0;
+            import polymorph:tls/client@0.1.0;
+            import polymorph:tls/server@0.1.0;
         }
     ",
     generate_all,
 });
 
-use lann::tls::client::Connector;
-use lann::tls::server::{Acceptor, Identity};
-use lann::tls::types::Error as TlsError;
+use polymorph::tls::client::Connector;
+use polymorph::tls::server::{Acceptor, Identity};
+use polymorph::tls::types::Error as TlsError;
 use wasip3::sockets::types::{
     ErrorCode, IpAddressFamily, IpSocketAddress, Ipv4SocketAddress, Ipv6SocketAddress, TcpSocket,
 };

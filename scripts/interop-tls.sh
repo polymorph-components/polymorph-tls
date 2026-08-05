@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TLS interop: the composed lann:tls component against independent
+# TLS interop: the composed polymorph:tls component against independent
 # implementations — OpenSSL (s_server/s_client) and Go (crypto/tls) —
 # over real TCP through wasi:sockets, in both directions, under a fresh
 # Ed25519 private PKI.
@@ -16,7 +16,7 @@ WASM=target/wasm32-wasip2/debug
 COMPOSED=$WASM/tls-tcp-composed.wasm
 RUN=(timeout 60 wasmtime run -W component-model-async=y -S p3 -S inherit-network)
 
-wac plug --plug "$WASM/lann_tls_component.wasm" "$WASM/tls_tcp.wasm" -o "$COMPOSED"
+wac plug --plug "$WASM/polymorph_tls_component.wasm" "$WASM/tls_tcp.wasm" -o "$COMPOSED"
 
 # Runs the composed demo with the PKI directory preopened at /pki.
 demo() { "${RUN[@]}" --dir "$work::/pki" "$COMPOSED" "$@"; }
@@ -34,11 +34,11 @@ log "openssl s_client -> our server (clean close, echo)"
 demo server 127.0.0.1 0 /pki/leaf.der /pki/leaf-key.p8 > "$work/our_server.log" 2>&1 &
 server_job=$!
 port=$(wait_port "$work/our_server.log")
-{ printf 'openssl-to-lann\n'; sleep 2; } | timeout 30 openssl s_client \
+{ printf 'openssl-to-polymorph\n'; sleep 2; } | timeout 30 openssl s_client \
     -connect "127.0.0.1:$port" -tls1_3 -alpn tls-interop/1 \
     -CAfile "$work/ca.pem" -verify_return_error -verify_hostname localhost \
     -servername localhost -quiet -no_ign_eof > "$work/s_client.log" 2>&1
-grep -qx 'openssl-to-lann' "$work/s_client.log"
+grep -qx 'openssl-to-polymorph' "$work/s_client.log"
 wait "$server_job"
 grep -q 'tls receive: clean close_notify' "$work/our_server.log"
 cat "$work/our_server.log"
@@ -47,7 +47,7 @@ log "Go tls-client -> our server (asserts our close_notify)"
 demo server 127.0.0.1 0 /pki/leaf.der /pki/leaf-key.p8 > "$work/our_server2.log" 2>&1 &
 server_job=$!
 port=$(wait_port "$work/our_server2.log")
-"$peer" tls-client -port "$port" -ca "$work/ca.pem" -payload go-to-lann
+"$peer" tls-client -port "$port" -ca "$work/ca.pem" -payload go-to-polymorph
 wait "$server_job"
 cat "$work/our_server2.log"
 

@@ -1,6 +1,6 @@
 [package]
 name = "webcrypto-signer"
-description = "The lann:tls signer shim over a lann:webcrypto provider: TLS CertificateVerify signatures from a webcrypto-held Ed25519 key"
+description = "The polymorph:tls signer shim over a polymorph:webcrypto provider: TLS CertificateVerify signatures from a webcrypto-held Ed25519 key"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

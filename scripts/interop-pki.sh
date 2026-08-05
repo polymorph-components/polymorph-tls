@@ -8,7 +8,7 @@ out=${1:?usage: interop-pki.sh <output-dir>}
 mkdir -p "$out"
 
 openssl genpkey -algorithm ed25519 -out "$out/ca-key.pem"
-openssl req -new -x509 -key "$out/ca-key.pem" -subj "/CN=lann:tls interop CA" \
+openssl req -new -x509 -key "$out/ca-key.pem" -subj "/CN=polymorph:tls interop CA" \
     -addext basicConstraints=critical,CA:TRUE -days 7 -out "$out/ca.pem"
 
 openssl genpkey -algorithm ed25519 -out "$out/leaf-key.pem"

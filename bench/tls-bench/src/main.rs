@@ -103,7 +103,7 @@ fn suite_label(suite: CipherSuite) -> &'static str {
 // --- QUIC packet protection ---
 
 fn aead() {
-    for suite in lann_tls_quinn::provider().cipher_suites.iter() {
+    for suite in polymorph_tls_quinn::provider().cipher_suites.iter() {
         let label = suite_label(suite.suite());
         let tls13 = suite.tls13().expect("profile suites are TLS 1.3");
         let algorithm = tls13
@@ -215,7 +215,7 @@ fn rate_row(name: &str, label: &str, size: usize, median: f64, min: f64, max: f6
 
 /// A provider restricted to one profile suite, for per-suite rows.
 fn single_suite_provider(suite: SupportedCipherSuite) -> Arc<CryptoProvider> {
-    let base = lann_tls::provider();
+    let base = polymorph_tls::provider();
     Arc::new(CryptoProvider {
         cipher_suites: vec![suite],
         ..Arc::try_unwrap(base).unwrap_or_else(|arc| (*arc).clone())
@@ -229,7 +229,7 @@ fn configs(
     roots
         .add(CertificateDer::from(CA_DER.to_vec()))
         .expect("fixture CA");
-    let identity = lann_tls_profile::Ed25519Identity::from_pkcs8_der(
+    let identity = polymorph_tls_profile::Ed25519Identity::from_pkcs8_der(
         vec![CertificateDer::from(LEAF_DER.to_vec())],
         LEAF_KEY_P8,
     )
@@ -243,9 +243,9 @@ fn configs(
                 .with_root_certificates(roots)
                 .with_no_client_auth();
             let (chain, key) = {
-                let identity = lann_tls_profile::ServerIdentity::Ed25519(identity);
+                let identity = polymorph_tls_profile::ServerIdentity::Ed25519(identity);
                 match identity {
-                    lann_tls_profile::ServerIdentity::Ed25519(id) => id.into_parts(),
+                    polymorph_tls_profile::ServerIdentity::Ed25519(id) => id.into_parts(),
                     _ => unreachable!(),
                 }
             };
@@ -258,8 +258,8 @@ fn configs(
             (client, server)
         }
         None => (
-            lann_tls::client_config(roots),
-            lann_tls::server_config(lann_tls_profile::ServerIdentity::Ed25519(identity))
+            polymorph_tls::client_config(roots),
+            polymorph_tls::server_config(polymorph_tls_profile::ServerIdentity::Ed25519(identity))
                 .expect("fixture identity"),
         ),
     };
@@ -344,8 +344,8 @@ const BULK_CHUNK: usize = 32 * 1024;
 
 fn bulk() {
     for suite in [
-        lann_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
-        lann_tls_quinn::TLS13_AES_128_GCM_SHA256,
+        polymorph_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
+        polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256,
     ] {
         let label = suite_label(suite.suite());
         let (client_config, server_config) = configs(Some(single_suite_provider(suite)));

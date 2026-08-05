@@ -1,4 +1,4 @@
-module lann-tls-interop-peer
+module polymorph-tls-interop-peer
 
 go 1.25.0
 

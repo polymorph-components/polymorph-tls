@@ -1,6 +1,6 @@
 [package]
 name = "tls-virt-guest"
-description = "wasi:sockets virtualizer component: transparent TLS tunneling for suffix-opted hostnames via the composed lann:tls client"
+description = "wasi:sockets virtualizer component: transparent TLS tunneling for suffix-opted hostnames via the composed polymorph:tls client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

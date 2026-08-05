@@ -91,7 +91,7 @@ bench,tls-bulk,chacha20-poly1305,MB/s,342.1,339.1,345.4
 bench,tls-bulk,aes-128-gcm,MB/s,110.9,110.1,111.3
 ```
 
-## composed lann:tls component under Wasmtime (component-model async)
+## composed polymorph:tls component under Wasmtime (component-model async)
 
 ```
 bench,component-bulk,negotiated,MB/s,258.7,255.3,261.4

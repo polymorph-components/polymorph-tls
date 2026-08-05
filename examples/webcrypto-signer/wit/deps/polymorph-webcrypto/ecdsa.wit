@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// ECDSA verification-key minting (FIPS 186-5).
 ///

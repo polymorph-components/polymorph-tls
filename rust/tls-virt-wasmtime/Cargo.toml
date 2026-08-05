@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 bytes = "1"
-lann-tls = { workspace = true }
+polymorph-tls = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 tls-virt-common = { workspace = true }

@@ -1,8 +1,8 @@
-//! The `lann:tls` component: the algorithm profile's enforced delivery.
+//! The `polymorph:tls` component: the algorithm profile's enforced delivery.
 //!
 //! Exports the package's `client` and `server` interfaces over
 //! component-model async streams, implemented with rustls over the
-//! pure-RustCrypto profile provider (`lann-tls`). Consumers get no
+//! pure-RustCrypto profile provider (`polymorph-tls`). Consumers get no
 //! algorithm-configuration surface; the signing policy is structural
 //! (`identity::ed25519` accepts Ed25519 PKCS#8 only, `identity::delegated`
 //! holds no key at all).
@@ -29,14 +29,14 @@ wit_bindgen::generate!({
     // but rustls consumes signatures synchronously, so these imports are
     // sync-lowered: the calling task blocks while the signer subtask runs.
     async: [
-        "-import:lann:tls/signer@0.1.0#sign",
-        "-import:lann:tls/signer@0.1.0#schemes",
+        "-import:polymorph:tls/signer@0.1.0#sign",
+        "-import:polymorph:tls/signer@0.1.0#schemes",
     ],
 });
 
-use exports::lann::tls::client::{Guest as ClientGuest, GuestConnector};
-use exports::lann::tls::server::{Guest as ServerGuest, GuestAcceptor, GuestIdentity};
-use exports::lann::tls::types::{ConnectionInfo, Error, Guest as TypesGuest, GuestError};
+use exports::polymorph::tls::client::{Guest as ClientGuest, GuestConnector};
+use exports::polymorph::tls::server::{Guest as ServerGuest, GuestAcceptor, GuestIdentity};
+use exports::polymorph::tls::types::{ConnectionInfo, Error, Guest as TypesGuest, GuestError};
 
 use crate::pump::Wired;
 
@@ -111,7 +111,7 @@ impl GuestConnector for Connector {
                 .add(cert.clone())
                 .map_err(|e| TlsError::resource(format!("invalid root certificate: {e}")))?;
         }
-        let mut config = lann_tls::client_config(roots);
+        let mut config = polymorph_tls::client_config(roots);
         config.alpn_protocols = alpn_protocols;
 
         let name = rustls_pki_types::ServerName::try_from(server_name.clone())
@@ -129,7 +129,7 @@ impl GuestConnector for Connector {
 
 /// The `server.identity` resource.
 pub enum Identity {
-    Ed25519(lann_tls_profile::Ed25519Identity),
+    Ed25519(polymorph_tls_profile::Ed25519Identity),
     #[cfg_attr(not(feature = "delegated-signer"), allow(dead_code))]
     Delegated {
         chain: Vec<CertificateDer<'static>>,
@@ -142,20 +142,20 @@ impl GuestIdentity for Identity {
     fn ed25519(
         chain: Vec<Vec<u8>>,
         private_key_pkcs8_der: Vec<u8>,
-    ) -> Result<exports::lann::tls::server::Identity, Error> {
+    ) -> Result<exports::polymorph::tls::server::Identity, Error> {
         let chain = chain.into_iter().map(CertificateDer::from).collect();
         let identity =
-            lann_tls_profile::Ed25519Identity::from_pkcs8_der(chain, &private_key_pkcs8_der)
+            polymorph_tls_profile::Ed25519Identity::from_pkcs8_der(chain, &private_key_pkcs8_der)
                 .map_err(|e| TlsError::resource(e.to_string()))?;
-        Ok(exports::lann::tls::server::Identity::new(Self::Ed25519(
-            identity,
-        )))
+        Ok(exports::polymorph::tls::server::Identity::new(
+            Self::Ed25519(identity),
+        ))
     }
 
     #[cfg(not(feature = "delegated-signer"))]
     async fn delegated(
         _chain: Vec<Vec<u8>>,
-    ) -> Result<exports::lann::tls::server::Identity, Error> {
+    ) -> Result<exports::polymorph::tls::server::Identity, Error> {
         Err(TlsError::resource(
             "no signer is composed: this build serves the `tls` world; delegated identities \
              require the `tls-delegated` world",
@@ -163,41 +163,45 @@ impl GuestIdentity for Identity {
     }
 
     #[cfg(feature = "delegated-signer")]
-    async fn delegated(chain: Vec<Vec<u8>>) -> Result<exports::lann::tls::server::Identity, Error> {
+    async fn delegated(
+        chain: Vec<Vec<u8>>,
+    ) -> Result<exports::polymorph::tls::server::Identity, Error> {
         let schemes = delegated::signer_schemes();
         if schemes.is_empty() {
             return Err(TlsError::resource(
                 "the composed signer reports no usable signature schemes",
             ));
         }
-        Ok(exports::lann::tls::server::Identity::new(Self::Delegated {
-            chain: chain.into_iter().map(CertificateDer::from).collect(),
-            schemes,
-        }))
+        Ok(exports::polymorph::tls::server::Identity::new(
+            Self::Delegated {
+                chain: chain.into_iter().map(CertificateDer::from).collect(),
+                schemes,
+            },
+        ))
     }
 }
 
 /// The `server.acceptor` resource.
 pub struct Acceptor {
-    identity: RefCell<Option<lann_tls_profile::ServerIdentity>>,
+    identity: RefCell<Option<polymorph_tls_profile::ServerIdentity>>,
     wired: RefCell<Wired>,
 }
 
 impl GuestAcceptor for Acceptor {
-    fn new(identity: exports::lann::tls::server::IdentityBorrow<'_>) -> Self {
+    fn new(identity: exports::polymorph::tls::server::IdentityBorrow<'_>) -> Self {
         let identity: &Identity = identity.get();
         let server_identity = match identity {
             Identity::Ed25519(id) => {
                 // Rebuild from parts: the identity resource stays usable for
                 // further acceptors.
                 let (chain, key) = (id.chain().to_vec(), id.key_der());
-                lann_tls_profile::Ed25519Identity::from_pkcs8_der(chain, key.secret_der())
-                    .map(lann_tls_profile::ServerIdentity::Ed25519)
+                polymorph_tls_profile::Ed25519Identity::from_pkcs8_der(chain, key.secret_der())
+                    .map(polymorph_tls_profile::ServerIdentity::Ed25519)
                     .ok()
             }
             #[cfg(feature = "delegated-signer")]
             Identity::Delegated { chain, schemes } => {
-                Some(lann_tls_profile::ServerIdentity::External {
+                Some(polymorph_tls_profile::ServerIdentity::External {
                     chain: chain.clone(),
                     signer: Arc::new(delegated::DelegatedKey::new(schemes.clone())),
                 })
@@ -231,7 +235,7 @@ impl GuestAcceptor for Acceptor {
             .borrow_mut()
             .take()
             .ok_or_else(|| TlsError::resource("acceptor has no usable identity"))?;
-        let mut config = lann_tls::server_config(identity)
+        let mut config = polymorph_tls::server_config(identity)
             .map_err(|e| TlsError::resource(format!("server config failed: {e}")))?;
         config.alpn_protocols = alpn_protocols;
 
@@ -275,7 +279,7 @@ mod delegated {
     use rustls::sign::{Signer, SigningKey};
     use rustls::{SignatureAlgorithm, SignatureScheme};
 
-    use super::lann::tls::signer as import;
+    use super::polymorph::tls::signer as import;
 
     fn from_wit(scheme: import::SignatureScheme) -> SignatureScheme {
         match scheme {

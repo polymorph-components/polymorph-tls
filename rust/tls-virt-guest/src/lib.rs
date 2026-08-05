@@ -4,7 +4,7 @@
 //! Imports and exports the same `wasi:sockets/types` and
 //! `wasi:sockets/ip-name-lookup` interfaces — the exports face the
 //! composed application, the imports face the host — backed by the
-//! host's implementations plus the composed `lann:tls` client:
+//! host's implementations plus the composed `polymorph:tls` client:
 //!
 //! - Resolving a name under the `.tls-virt.alt` suffix resolves the real
 //!   name via the host, stores the destination in a handle table, and
@@ -48,7 +48,7 @@ use exports::wasi::sockets::types::{
     Guest as TypesGuest, GuestTcpSocket, GuestUdpSocket, TcpSocket as TcpSocketResource,
     UdpSocket as UdpSocketResource,
 };
-use lann::tls::client::Connector;
+use polymorph::tls::client::Connector;
 use wasi::sockets::ip_name_lookup as host_lookup;
 use wasi::sockets::types as host;
 

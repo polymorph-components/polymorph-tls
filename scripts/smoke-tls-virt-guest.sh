@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Smoke rig for the tls-virt-guest delivery: compose the demo app, the
-# virtualizer, and the lann:tls component; run the composed component
+# virtualizer, and the polymorph:tls component; run the composed component
 # against `openssl s_server -rev` on localhost. The demo speaks plain
 # TCP to a `.tls-virt.alt` name; every byte on the wire is TLS.
 #
-# Gates: the composition satisfies every lann:tls import (the demo's
+# Gates: the composition satisfies every polymorph:tls import (the demo's
 # sockets are wired to the virtualizer by compose.wac, and the composed
 # component's remaining wasi:sockets imports are the virtualizer's own
 # passthrough); the resolver returned a handle address (fd00::/8),
@@ -29,11 +29,11 @@ TESTDATA=rust/quinn/tests/testdata
 
 log "compose"
 wac compose \
-    --dep lann:tls-component="$WASM/lann_tls_component.wasm" \
-    --dep lann:tls-virt-guest="$WASM/tls_virt_guest.wasm" \
-    --dep lann:tls-virt-demo="$WASM/tls_virt_demo.wasm" \
+    --dep polymorph:tls-component="$WASM/polymorph_tls_component.wasm" \
+    --dep polymorph:tls-virt-guest="$WASM/tls_virt_guest.wasm" \
+    --dep polymorph:tls-virt-demo="$WASM/tls_virt_demo.wasm" \
     -o "$COMPOSED" rust/tls-virt-guest/compose.wac
-! wasm-tools component wit "$COMPOSED" | grep -qE 'import lann:tls/'
+! wasm-tools component wit "$COMPOSED" | grep -qE 'import polymorph:tls/'
 
 log "fixture PKI to PEM"
 openssl x509 -inform der -in "$TESTDATA/leaf.der" -out "$work/leaf.pem"

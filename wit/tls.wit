@@ -1,4 +1,4 @@
-package lann:tls@0.1.0;
+package polymorph:tls@0.1.0;
 
 /// Shared types for TLS connections.
 interface types {

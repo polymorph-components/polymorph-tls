@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// The `key-agreement` primitive kind: two-party Diffie–Hellman-style
 /// agreement, producing keying material as a `derive-input` rather than as

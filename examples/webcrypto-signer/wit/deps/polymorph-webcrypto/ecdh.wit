@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// ECDH key agreement over the NIST prime-order curves (SP 800-56A), as
 /// the Web Cryptography API serves it.

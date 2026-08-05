@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// PBKDF2 (RFC 8018) passwords: the hash-independent half of the PBKDF2
 /// surface. The `password` resource minted here parameterizes derivations

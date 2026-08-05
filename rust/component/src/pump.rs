@@ -24,7 +24,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
 use wit_bindgen::{FutureReader, FutureWriter, StreamReader, StreamResult, StreamWriter};
 
-use crate::component::exports::lann::tls::types::{ConnectionInfo, Error};
+use crate::component::exports::polymorph::tls::types::{ConnectionInfo, Error};
 use crate::{wit_future, wit_stream, HandshakeOutcome, TlsError};
 
 /// Stream-read hop size, both directions.

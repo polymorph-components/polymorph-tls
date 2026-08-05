@@ -1,13 +1,13 @@
 [package]
-name = "lann-tls-quinn"
+name = "polymorph-tls-quinn"
 description = "quinn compatibility for the profile: RFC 9001 packet protection over RustCrypto and the quinn-proto TLS session glue"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-lann-tls = { workspace = true }
-lann-tls-profile = { workspace = true }
+polymorph-tls = { workspace = true }
+polymorph-tls-profile = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 rustls-rustcrypto = { workspace = true }

@@ -33,7 +33,7 @@ jobs:
   timing-lab:
     # Scheduled workflows run in forks too, where this measures nothing
     # anyone reads.
-    if: github.repository == 'lann/component-tls'
+    if: github.repository == 'polymorph-components/polymorph-tls'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

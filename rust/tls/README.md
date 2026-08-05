@@ -1,10 +1,10 @@
-# `lann-tls`
+# `polymorph-tls`
 
 The algorithm profile's **curated** delivery: a pure-RustCrypto rustls
 `CryptoProvider` and preconfigured TLS 1.3 configs for Rust guests that
 link their TLS in-process. The policy itself — suites, groups, schemes,
 preference orders, signing postures, per-item timing classes — is
-[`lann-tls-profile`](../profile/README.md); this crate assembles the
+[`polymorph-tls-profile`](../profile/README.md); this crate assembles the
 implementations that deliver it.
 
 A consumer of this crate makes no algorithm choices. It can always drop to
@@ -23,8 +23,8 @@ a separate component's memory — should compose the component delivery
 instead (see the [repository README](../../README.md), "Design").
 
 QUIC consumers: the core is deliberately QUIC-free. The quinn
-compatibility layer is [`lann-tls-quinn`](../quinn/README.md), driven over
-`wasi:sockets` by [`lann-quinn-wasi`](../quinn-wasi/).
+compatibility layer is [`polymorph-tls-quinn`](../quinn/README.md), driven over
+`wasi:sockets` by [`polymorph-quinn-wasi`](../quinn-wasi/).
 
 ## Provider selection: `rustls-rustcrypto`
 
@@ -41,7 +41,7 @@ rather than an in-repo provider. Audit findings behind that decision:
 - **QUIC**: upstream's QUIC support is an unwired stub — every suite
   carries `quic: None` and its `quic.rs` bodies are `todo!()`. The QUIC
   packet-protection layer therefore lives in this repository
-  ([`lann-tls-quinn`](../quinn/README.md)), a candidate for upstream
+  ([`polymorph-tls-quinn`](../quinn/README.md)), a candidate for upstream
   contribution.
 - **Class-D signing code**: upstream compiles its ECDSA and RSA signing
   modules unconditionally. They are unreachable through this crate — the
@@ -96,7 +96,7 @@ verification algorithms serve both trust models.
 ## Timing classes and residual assumptions
 
 The classification and its sources are inherited from
-[component-webcrypto's in-guest provider README](https://github.com/lann/component-webcrypto/blob/main/rust/guest-provider/README.md).
+[component-webcrypto's in-guest provider README](https://github.com/polymorph-components/polymorph-webcrypto/blob/main/rust/guest-provider/README.md).
 Verification rows are secret-free (public keys over public signatures) and
 therefore class-exempt.
 

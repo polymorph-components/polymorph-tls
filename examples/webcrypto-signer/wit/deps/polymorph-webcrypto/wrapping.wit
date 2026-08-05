@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// Provider-held intermediates for key wrapping: moving one key's material
 /// under another key without the material transiting the caller.

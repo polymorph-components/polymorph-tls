@@ -12,10 +12,10 @@ SIMD_DIR=target/simd128
 >&2 echo "building (native, wasm, wasm+simd128, composed)..."
 cargo build --quiet --release -p tls-bench -p quic-native-bench
 cargo build --quiet --release --target wasm32-wasip2 \
-    -p tls-bench -p quic-loopback -p tls-component-bench -p lann-tls-component
+    -p tls-bench -p quic-loopback -p tls-component-bench -p polymorph-tls-component
 RUSTFLAGS="-C target-feature=+simd128" cargo build --quiet --release \
     -p tls-bench --target wasm32-wasip2 --target-dir "$SIMD_DIR"
-wac plug --plug "$WASM/lann_tls_component.wasm" "$WASM/tls_component_bench.wasm" \
+wac plug --plug "$WASM/polymorph_tls_component.wasm" "$WASM/tls_component_bench.wasm" \
     -o target/tls-component-bench-composed.wasm
 
 cpu=$( (grep -m1 'model name' /proc/cpuinfo || lscpu | grep -m1 -E 'Model name|Vendor ID') 2>/dev/null | sed 's/.*: *//' )
@@ -52,6 +52,6 @@ section "wasm32-wasip2 under Wasmtime (+simd128)"
 wasmtime run "$SIMD_DIR/wasm32-wasip2/release/tls-bench.wasm" all
 end
 
-section "composed lann:tls component under Wasmtime (component-model async)"
+section "composed polymorph:tls component under Wasmtime (component-model async)"
 wasmtime run -W component-model-async=y target/tls-component-bench-composed.wasm 8 20
 end

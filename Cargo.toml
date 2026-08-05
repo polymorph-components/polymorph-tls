@@ -29,7 +29,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-lann-tls-profile = { path = "rust/profile" }
+polymorph-tls-profile = { path = "rust/profile" }
 
 rustls = { version = "0.23", default-features = false, features = ["std"] }
 rustls-pki-types = "1"
@@ -40,10 +40,10 @@ quinn-proto = { version = "0.11", default-features = false }
 
 ed25519-dalek = { version = "3", default-features = false, features = ["alloc", "pkcs8", "zeroize"] }
 
-lann-tls = { path = "rust/tls" }
-lann-tls-quinn = { path = "rust/quinn" }
+polymorph-tls = { path = "rust/tls" }
+polymorph-tls-quinn = { path = "rust/quinn" }
 tls-virt-common = { path = "rust/tls-virt-common" }
-lann-quinn-wasi = { path = "rust/quinn-wasi" }
+polymorph-quinn-wasi = { path = "rust/quinn-wasi" }
 
 wasi = "0.14"
 wit-bindgen = { version = "0.60", features = ["async-spawn"] }

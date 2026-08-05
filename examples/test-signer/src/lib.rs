@@ -1,4 +1,4 @@
-//! A test implementation of `lann:tls/signer`.
+//! A test implementation of `polymorph:tls/signer`.
 //!
 //! Holds the test fixture's Ed25519 key and signs CertificateVerify
 //! messages with it — standing in, for composed smoke tests, for the
@@ -13,13 +13,13 @@ wit_bindgen::generate!({
     inline: "
         package inline:signer;
         world signer-impl {
-            export lann:tls/signer@0.1.0;
+            export polymorph:tls/signer@0.1.0;
         }
     ",
     generate_all,
 });
 
-use exports::lann::tls::signer::{Guest, SignatureScheme};
+use exports::polymorph::tls::signer::{Guest, SignatureScheme};
 
 const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
 

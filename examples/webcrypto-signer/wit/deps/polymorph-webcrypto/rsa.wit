@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// The RSA signature family's shared parameterization and admission
 /// contract. Interfaces minting RSA verification keys

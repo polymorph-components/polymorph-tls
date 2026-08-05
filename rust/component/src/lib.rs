@@ -1,4 +1,4 @@
-//! The `lann:tls` component crate. All content targets WASI; on other
+//! The `polymorph:tls` component crate. All content targets WASI; on other
 //! targets this crate is empty (the cdylib exists only as a wasm
 //! component).
 

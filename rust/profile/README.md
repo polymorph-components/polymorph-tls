@@ -11,7 +11,7 @@ signing rule by API shape.
 
 Whether an algorithm is safe to run in wasm is a timing-channel question.
 The classification (classes A–D) and its sources are inherited from
-[component-webcrypto's in-guest provider README](https://github.com/lann/component-webcrypto/blob/main/rust/guest-provider/README.md)
+[component-webcrypto's in-guest provider README](https://github.com/polymorph-components/polymorph-webcrypto/blob/main/rust/guest-provider/README.md)
 — read that first; this document only records the per-item assignments.
 In brief: A is structurally constant-time; B trusts a constant-latency
 multiplier and benign JIT lowering; C is constant-time only via a costly
@@ -110,7 +110,7 @@ Two scope notes:
   controlled-both-ends deployment shape, never a WebPKI substitute.
 - It is specific to the profile's in-process deliveries. Host-terminated
   TLS providers generally cannot serve RFC 7250, so raw-public-key
-  consumers are pinned to the in-guest implementation; the `lann:tls`
+  consumers are pinned to the in-guest implementation; the `polymorph:tls`
   component surface deliberately does not carry it.
 
 ## TLS versions

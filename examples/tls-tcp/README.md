@@ -1,6 +1,6 @@
 # `tls-tcp`
 
-The real-transport demo and consumer example for the `lann:tls`
+The real-transport demo and consumer example for the `polymorph:tls`
 component: TLS over actual `wasi:sockets` TCP, composed the same way an
 application would consume it.
 
@@ -19,7 +19,7 @@ async, WASIp3, and network access:
 
 ```sh
 cargo build --workspace --target wasm32-wasip2
-wac plug --plug target/wasm32-wasip2/debug/lann_tls_component.wasm \
+wac plug --plug target/wasm32-wasip2/debug/polymorph_tls_component.wasm \
     target/wasm32-wasip2/debug/tls_tcp.wasm -o tls-tcp-composed.wasm
 
 wasmtime run -W component-model-async=y -S p3 -S inherit-network \

@@ -21,7 +21,7 @@ use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use lann_tls_profile::{Ed25519Identity, ServerIdentity};
+use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
 use quinn_proto::{
     ClientConfig, ConnectionEvent, ConnectionHandle, DatagramEvent, Dir, Endpoint, EndpointConfig,
     Event, ServerConfig, StreamId, TransportConfig, VarInt,
@@ -57,7 +57,7 @@ fn die(message: String) -> ! {
     std::process::exit(1);
 }
 
-/// The `std::net` counterpart of `lann_quinn_wasi::Driver`, pump logic
+/// The `std::net` counterpart of `polymorph_quinn_wasi::Driver`, pump logic
 /// mirrored step for step.
 struct Driver {
     endpoint: Endpoint,
@@ -267,18 +267,18 @@ fn bench(mib: usize) {
 
     let local = SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 0);
     let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-        lann_tls_quinn::ResetKey::new(b"bench reset key"),
+        polymorph_tls_quinn::ResetKey::new(b"bench reset key"),
     )));
     let identity =
         Ed25519Identity::from_pkcs8_der(vec![CertificateDer::from(LEAF_DER.to_vec())], LEAF_KEY_P8)
             .expect("leaf key is Ed25519");
-    let tls_server = lann_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
+    let tls_server = polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
         .expect("server config");
-    let quic_server: lann_tls_quinn::QuicServerConfig =
+    let quic_server: polymorph_tls_quinn::QuicServerConfig =
         tls_server.try_into().expect("initial suite");
     let mut server_config = ServerConfig::new(
         Arc::new(quic_server),
-        Arc::new(lann_tls_quinn::TokenKey::new(b"bench token key")),
+        Arc::new(polymorph_tls_quinn::TokenKey::new(b"bench token key")),
     );
     server_config.transport = transport.clone();
     let mut server = Driver::new(
@@ -295,9 +295,10 @@ fn bench(mib: usize) {
     roots
         .add(CertificateDer::from(CA_DER.to_vec()))
         .expect("CA parses");
-    let quic_client: lann_tls_quinn::QuicClientConfig = lann_tls_quinn::client_config(roots, ALPN)
-        .try_into()
-        .expect("initial suite");
+    let quic_client: polymorph_tls_quinn::QuicClientConfig =
+        polymorph_tls_quinn::client_config(roots, ALPN)
+            .try_into()
+            .expect("initial suite");
     let mut client_config = ClientConfig::new(Arc::new(quic_client));
     client_config.transport_config(transport);
     let mut client = Driver::new(

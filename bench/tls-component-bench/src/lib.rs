@@ -1,4 +1,4 @@
-//! Benchmark guest for the composed `lann:tls` component.
+//! Benchmark guest for the composed `polymorph:tls` component.
 //!
 //! The component-boundary counterpart of `tls-bench bulk`/`handshake`:
 //! where that binary runs rustls in-process, this guest pushes the same
@@ -34,16 +34,16 @@ wit_bindgen::generate!({
     inline: "
         package inline:app;
         world app {
-            import lann:tls/types@0.1.0;
-            import lann:tls/client@0.1.0;
-            import lann:tls/server@0.1.0;
+            import polymorph:tls/types@0.1.0;
+            import polymorph:tls/client@0.1.0;
+            import polymorph:tls/server@0.1.0;
         }
     ",
     generate_all,
 });
 
-use lann::tls::client::Connector;
-use lann::tls::server::{Acceptor, Identity};
+use polymorph::tls::client::Connector;
+use polymorph::tls::server::{Acceptor, Identity};
 
 const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
 const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");

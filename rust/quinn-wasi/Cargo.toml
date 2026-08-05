@@ -1,5 +1,5 @@
 [package]
-name = "lann-quinn-wasi"
+name = "polymorph-quinn-wasi"
 description = "Drives quinn-proto endpoints over wasi:sockets UDP: batched receive/transmit, wasi:clocks timers, pollable-based waiting"
 version.workspace = true
 edition.workspace = true

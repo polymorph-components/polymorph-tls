@@ -1,9 +1,9 @@
-package lann:webcrypto-signer@0.1.0;
+package polymorph:webcrypto-signer@0.1.0;
 
-/// Adapts a `lann:webcrypto` signing provider to `lann:tls/signer`: the
+/// Adapts a `polymorph:webcrypto` signing provider to `polymorph:tls/signer`: the
 /// TLS identity's Ed25519 key lives behind a webcrypto signing-key
 /// handle, wherever the composed provider keeps it.
 world shim {
-    import lann:webcrypto/ed25519-sign@0.1.0;
-    export lann:tls/signer@0.1.0;
+    import polymorph:webcrypto/ed25519-sign@0.1.0;
+    export polymorph:tls/signer@0.1.0;
 }

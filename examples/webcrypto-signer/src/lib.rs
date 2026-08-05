@@ -1,4 +1,4 @@
-//! Adapts a `lann:webcrypto` signing provider to `lann:tls/signer`.
+//! Adapts a `polymorph:webcrypto` signing provider to `polymorph:tls/signer`.
 //!
 //! The TLS identity's Ed25519 private key lives behind a webcrypto
 //! `signing-key` handle — in whatever the composed provider is (in-guest
@@ -19,9 +19,9 @@ wit_bindgen::generate!({
     generate_all,
 });
 
-use exports::lann::tls::signer::{Guest, SignatureScheme};
-use lann::webcrypto::ed25519_sign;
-use lann::webcrypto::signature::SigningKeyOptions;
+use exports::polymorph::tls::signer::{Guest, SignatureScheme};
+use polymorph::webcrypto::ed25519_sign;
+use polymorph::webcrypto::signature::SigningKeyOptions;
 
 const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
 

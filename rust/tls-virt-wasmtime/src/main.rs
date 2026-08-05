@@ -21,7 +21,7 @@
 //! `WasiSockets`), so passthrough behavior — including `listen` and its
 //! accepted sockets — is wasmtime-wasi's own, permission checks
 //! included. Tunnels are keyed off the socket's table index in a side
-//! map; their data path is native (tokio + rustls over the `lann-tls`
+//! map; their data path is native (tokio + rustls over the `polymorph-tls`
 //! profile configs) and never touches a wasmtime-wasi socket.
 //!
 //! ```text
@@ -111,7 +111,7 @@ pub(crate) struct VirtCtx {
     /// 0.2 suffix-opted resolutions being drained, keyed by the
     /// delegated resolve-stream resource's table index (see `p2`).
     pub(crate) p2_resolves: HashMap<u32, p2::P2Resolve>,
-    /// TLS 1.3 client configuration: the `lann-tls` profile configs
+    /// TLS 1.3 client configuration: the `polymorph-tls` profile configs
     /// over the baked fixture root.
     pub(crate) connector: TlsConnector,
     /// Runtime handle for the close_notify shutdown task (spawned from
@@ -136,7 +136,7 @@ impl VirtCtx {
         roots
             .add(CertificateDer::from(ROOT.to_vec()))
             .context("invalid baked root certificate")?;
-        let config = lann_tls::client_config(roots);
+        let config = polymorph_tls::client_config(roots);
 
         Ok(Self {
             names: HandleTable::new(),

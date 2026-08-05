@@ -3,7 +3,7 @@
 //! This crate is the single policy source for both of the profile's
 //! deliveries (the component and the Rust guest library). It contains no
 //! cryptography: the lists here name what the assembled stack
-//! (`lann-tls-quic-crypto`) must ship, in the order it must prefer it, and
+//! (`polymorph-tls-quic-crypto`) must ship, in the order it must prefer it, and
 //! the identity types enforce the signing policy by API shape.
 //!
 //! See `README.md` for the profile document: the per-item timing classes,

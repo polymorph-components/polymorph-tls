@@ -1,4 +1,4 @@
-# `lann:tls`
+# `polymorph:tls`
 
 A TLS 1.3 interface for WebAssembly components. Connections are stream
 transforms: the consumer owns the transport and hands byte streams across
@@ -114,11 +114,11 @@ never accumulated silently.
 
 - **Signer seam shape**: a minimal bespoke interface (scheme + complete
   RFC 8446 §4.4.3 message in, TLS wire-format signature out) rather than
-  reusing `lann:webcrypto`'s per-algorithm signing interfaces. Reuse
+  reusing `polymorph:webcrypto`'s per-algorithm signing interfaces. Reuse
   would couple this package's import surface to another package's
   key-resource model, and a shared error resource cannot cross the
   import/export direction anyway (resource types are instance-bound). A
-  small shim component can adapt a `lann:webcrypto` provider to
+  small shim component can adapt a `polymorph:webcrypto` provider to
   `signer`.
 - **The signer interface is async-typed but consumable synchronously.**
   Implementations may suspend — they hold keys behind other components,

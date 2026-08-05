@@ -1,4 +1,4 @@
-// Interop peer for the lann:tls rigs: an independent TLS 1.3 and QUIC
+// Interop peer for the polymorph:tls rigs: an independent TLS 1.3 and QUIC
 // implementation (Go crypto/tls and quic-go) on the other side of the
 // wire from the wasm guests.
 //

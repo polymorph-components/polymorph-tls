@@ -4,22 +4,22 @@
 // its sockets imports are rewired by explicit assignment onto the
 // virtualizer's exports of the same interfaces, while the virtualizer's
 // own `wasi:sockets` imports pass through to the host; the virtualizer
-// tunnels suffix-opted connections through the `lann:tls` client.
-package lann:tls-virt-composed;
+// tunnels suffix-opted connections through the `polymorph:tls` client.
+package polymorph:tls-virt-composed;
 
 // The TLS provider. Its wasi imports pass through to the host.
-let tls = new lann:tls-component { ... };
+let tls = new polymorph:tls-component { ... };
 
-// The virtualizer: TLS from the `lann:tls` instance; real sockets and
+// The virtualizer: TLS from the `polymorph:tls` instance; real sockets and
 // name lookup from the host.
-let virt = new lann:tls-virt-guest {
-    "lann:tls/types@0.1.0": tls["lann:tls/types@0.1.0"],
-    "lann:tls/client@0.1.0": tls["lann:tls/client@0.1.0"],
+let virt = new polymorph:tls-virt-guest {
+    "polymorph:tls/types@0.1.0": tls["polymorph:tls/types@0.1.0"],
+    "polymorph:tls/client@0.1.0": tls["polymorph:tls/client@0.1.0"],
     ...
 };
 
 // The demo app: every socket it can see is the virtualizer's.
-let demo = new lann:tls-virt-demo {
+let demo = new polymorph:tls-virt-demo {
     "wasi:sockets/types@0.3.0": virt["wasi:sockets/types@0.3.0"],
     "wasi:sockets/ip-name-lookup@0.3.0": virt["wasi:sockets/ip-name-lookup@0.3.0"],
     ...

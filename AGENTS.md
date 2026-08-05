@@ -4,21 +4,21 @@ Guidance for automated agents (and humans) working in this repository.
 
 ## What this repository is
 
-`lann:tls`: a TLS 1.3 WIT package plus a pure-wasm implementation, designed
+`polymorph:tls`: a TLS 1.3 WIT package plus a pure-wasm implementation, designed
 to serve QUIC over `wasi:sockets`. A sibling of
-[`lann:webcrypto`](https://github.com/lann/component-webcrypto) and
-[`lann:webrtc-datachannels`](https://github.com/lann/webrtc-datachannels),
+[`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
+[`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 deliberately mirroring their architecture — prefer clarity and correctness
 over features. See [`README.md`](README.md) for the design.
 
-The repository holds the `lann:tls` WIT package (`wit/`, with its README
+The repository holds the `polymorph:tls` WIT package (`wit/`, with its README
 of recorded rulings), the Rust deliveries, and their validation rigs. The
 open requirements live in the GitHub issue tracker, and the README is the
 design record.
 
 ## Layout
 
-- `wit/` — the `lann:tls` package; `wit/README.md` carries the package
+- `wit/` — the `polymorph:tls` package; `wit/README.md` carries the package
   contracts and recorded rulings (wasi-tls relationship, signer seam,
   worlds).
 - `rust/profile` — the algorithm profile as data plus the identity types;
@@ -29,7 +29,7 @@ design record.
   quinn-proto session glue, endpoint keys.
 - `rust/quinn-wasi` — quinn-proto driver over `wasi:sockets` UDP; no TLS
   or profile dependency.
-- `rust/component` — the `lann:tls` component (enforced delivery);
+- `rust/component` — the `polymorph:tls` component (enforced delivery);
   wasm-only cdylib, `delegated-signer` feature selects the
   `tls-delegated` world.
 - `rust/tls-virt-common` — the tls-virt scheme (suffix-opted names,
@@ -37,7 +37,7 @@ design record.
   tls-virt deliveries; its lib docs are the scheme record.
 - `rust/tls-virt-guest` — the guest tls-virt delivery: a `wasi:sockets`
   virtualizer component adding transparent TLS via the composed
-  `lann:tls` client; carries `compose.wac` and the record of the
+  `polymorph:tls` client; carries `compose.wac` and the record of the
   bindings findings in its README.
 - `rust/tls-virt-wasmtime` — the host tls-virt delivery: a wasmtime
   embedding whose sockets provider wraps wasmtime-wasi's; native crate,
@@ -47,7 +47,7 @@ design record.
 - `examples/tls-delegated-loopback`, `examples/test-signer`,
   `examples/webcrypto-signer` — the delegated-signer rig: the
   `tls-delegated` smoke guest, the self-contained fixture signer, and
-  the shim adapting a `lann:webcrypto` provider to `lann:tls/signer`.
+  the shim adapting a `polymorph:webcrypto` provider to `polymorph:tls/signer`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
 - `examples/tls-virt-demo`, `examples/tls-virt-demo-p2` — the plain-TCP
@@ -69,7 +69,7 @@ design record.
 | Recipe | Verifies |
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
-| `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `lann:webcrypto` provider |
+| `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `polymorph:webcrypto` provider |
 | `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider on both sockets generations — wasip3 and `std::net`/0.2 guests — with handle-address and profile-cipher-suite gates plus plain-TCP passthrough-delegation legs |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
@@ -86,7 +86,7 @@ Two invariants are already fixed:
   feature.
 - **Class-D operations never run in the guest.** The timing-channel
   classification (classes A–D) is inherited from
-  [`component-webcrypto`'s in-guest provider README](https://github.com/lann/component-webcrypto/blob/main/rust/guest-provider/README.md)
+  [`component-webcrypto`'s in-guest provider README](https://github.com/polymorph-components/polymorph-webcrypto/blob/main/rust/guest-provider/README.md)
   — read it before touching anything cryptographic. The endpoint's own
   CertificateVerify signature is the one class-D-shaped operation in TLS
   1.3; it is served by an Ed25519 (class B) identity key in-guest or by a

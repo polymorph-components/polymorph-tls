@@ -5,7 +5,7 @@ transparently: an application that speaks plain TCP through
 `wasi:sockets` is composed against this component instead of the host,
 opts a hostname in by suffixing it with `.tls-virt.alt`, and every byte
 it exchanges on that connection crosses the wire inside TLS 1.3 driven
-by the composed `lann:tls` client. The application contains no TLS code
+by the composed `polymorph:tls` client. The application contains no TLS code
 and cannot observe the tunnel; everything else — unsuffixed names,
 literal addresses, UDP — passes through to the host unchanged.
 
@@ -13,7 +13,7 @@ The guest delivery of the tls-virt scheme: the name opt-in and
 handle-address design live in [`tls-virt-common`](../tls-virt-common),
 and [`tls-virt-wasmtime`](../tls-virt-wasmtime) implements the same
 interposition host-side. Originally built to validate the analysis in
-issue #14: that the `lann:tls` transform-pair interface (send/receive
+issue #14: that the `polymorph:tls` transform-pair interface (send/receive
 wired before the handshake) can sit behind a connect-then-send sockets
 surface, at the cost of one pipe and one splice task on the transmit
 side. It can.
@@ -72,7 +72,7 @@ bearing for any sockets-shaped virtualizer:
   All long-lived tunnel work — the transmit splice and the TLS-verdict
   mappers — is therefore spawned inside async `connect`, whose task
   stays alive (after returning its value) until the connection ends;
-  the same pattern as the `lann:tls` component's own pump. The sync
+  the same pattern as the `polymorph:tls` component's own pump. The sync
   exports only hand out endpoints minted at connect time, and the
   sync-export error paths use writer-drop defaults
   (`wit_future::new(default)`) instead of tasks. Two consequences:
@@ -100,7 +100,7 @@ productionization gaps.
 just smoke-tls-virt-guest
 ```
 
-Builds the `lann:tls` component (plain world), this virtualizer, and
+Builds the `polymorph:tls` component (plain world), this virtualizer, and
 the demo app (`examples/tls-virt-demo`); composes them per
 `compose.wac` (`wac compose`, with the import-satisfaction gate); then
 runs the composed component against `openssl s_server -rev` on

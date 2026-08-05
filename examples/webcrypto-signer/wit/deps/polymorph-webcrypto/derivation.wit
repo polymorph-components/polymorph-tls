@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// The `derivation` primitive kind: turning secrets that are not yet keys —
 /// an agreement's shared secret, imported input keying material (IKM), a

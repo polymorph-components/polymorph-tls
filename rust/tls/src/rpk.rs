@@ -35,7 +35,7 @@
 
 use std::sync::Arc;
 
-use lann_tls_profile::{public_key_from_ed25519_spki, RpkIdentity, RpkSigner};
+use polymorph_tls_profile::{public_key_from_ed25519_spki, RpkIdentity, RpkSigner};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::client::AlwaysResolvesClientRawPublicKeys;
 use rustls::crypto::{verify_tls13_signature_with_raw_key, WebPkiSupportedAlgorithms};
@@ -128,7 +128,7 @@ impl RpkServerVerifier {
     /// with `algorithms` (use the profile provider's).
     pub fn new(expected_key: &[u8; 32], algorithms: WebPkiSupportedAlgorithms) -> Self {
         Self {
-            expected_spki: lann_tls_profile::ed25519_spki(expected_key),
+            expected_spki: polymorph_tls_profile::ed25519_spki(expected_key),
             algorithms,
         }
     }
@@ -285,7 +285,7 @@ mod tests {
 
         let mut wrong = identity.public_key();
         wrong[0] ^= 1;
-        let presented = CertificateDer::from(lann_tls_profile::ed25519_spki(&wrong));
+        let presented = CertificateDer::from(polymorph_tls_profile::ed25519_spki(&wrong));
         assert!(verifier
             .verify_server_cert(&presented, &[], &name, &[], now)
             .is_err());

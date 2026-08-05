@@ -23,7 +23,7 @@ just bench > bench/results/<date>-<host>.md
   detection; wasm builds use the fixsliced software path the release
   audit pins.
 - **`tls-component-bench`** — the same bulk and handshake work pushed
-  through the composed `lann:tls` component's streams
+  through the composed `polymorph:tls` component's streams
   (`component-bulk`, `component-handshake`). Compared against
   `tls-bench` under the same runtime, the delta is the cost of
   componentization: canonical-ABI copies plus async plumbing. The

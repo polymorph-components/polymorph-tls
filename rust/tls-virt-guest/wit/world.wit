@@ -1,4 +1,4 @@
-package lann:tls-virt@0.1.0;
+package polymorph:tls-virt@0.1.0;
 
 /// A `wasi:sockets` virtualizer that adds TLS transparently.
 ///
@@ -10,8 +10,8 @@ package lann:tls-virt@0.1.0;
 world virtualizer {
     import wasi:sockets/types@0.3.0;
     import wasi:sockets/ip-name-lookup@0.3.0;
-    import lann:tls/types@0.1.0;
-    import lann:tls/client@0.1.0;
+    import polymorph:tls/types@0.1.0;
+    import polymorph:tls/client@0.1.0;
 
     export wasi:sockets/types@0.3.0;
     export wasi:sockets/ip-name-lookup@0.3.0;

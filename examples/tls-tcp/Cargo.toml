@@ -1,6 +1,6 @@
 [package]
 name = "tls-tcp"
-description = "Real-transport demo: the lann:tls component over wasi:sockets TCP"
+description = "Real-transport demo: the polymorph:tls component over wasi:sockets TCP"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1248,67 +1248,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lann-quinn-wasi"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "quinn-proto",
- "wasi 0.14.7+wasi-0.2.4",
-]
-
-[[package]]
-name = "lann-tls"
-version = "0.1.0"
-dependencies = [
- "lann-tls-profile",
- "rustls",
- "rustls-pki-types",
- "rustls-rustcrypto",
-]
-
-[[package]]
-name = "lann-tls-component"
-version = "0.1.0"
-dependencies = [
- "futures",
- "lann-tls",
- "lann-tls-profile",
- "rustls",
- "rustls-pki-types",
- "wit-bindgen 0.60.0",
-]
-
-[[package]]
-name = "lann-tls-profile"
-version = "0.1.0"
-dependencies = [
- "ed25519-dalek",
- "rustls",
- "rustls-pki-types",
-]
-
-[[package]]
-name = "lann-tls-quinn"
-version = "0.1.0"
-dependencies = [
- "aead",
- "aes",
- "aes-gcm",
- "bytes",
- "chacha20",
- "chacha20poly1305",
- "hkdf",
- "hmac",
- "lann-tls",
- "lann-tls-profile",
- "quinn-proto",
- "rustls",
- "rustls-pki-types",
- "rustls-rustcrypto",
- "sha2 0.11.0",
-]
-
-[[package]]
 name = "leb128"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1542,6 +1481,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "polymorph-quinn-wasi"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "quinn-proto",
+ "wasi 0.14.7+wasi-0.2.4",
+]
+
+[[package]]
+name = "polymorph-tls"
+version = "0.1.0"
+dependencies = [
+ "polymorph-tls-profile",
+ "rustls",
+ "rustls-pki-types",
+ "rustls-rustcrypto",
+]
+
+[[package]]
+name = "polymorph-tls-component"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "polymorph-tls",
+ "polymorph-tls-profile",
+ "rustls",
+ "rustls-pki-types",
+ "wit-bindgen 0.60.0",
+]
+
+[[package]]
+name = "polymorph-tls-profile"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "rustls",
+ "rustls-pki-types",
+]
+
+[[package]]
+name = "polymorph-tls-quinn"
+version = "0.1.0"
+dependencies = [
+ "aead",
+ "aes",
+ "aes-gcm",
+ "bytes",
+ "chacha20",
+ "chacha20poly1305",
+ "hkdf",
+ "hmac",
+ "polymorph-tls",
+ "polymorph-tls-profile",
+ "quinn-proto",
+ "rustls",
+ "rustls-pki-types",
+ "rustls-rustcrypto",
+ "sha2 0.11.0",
+]
+
+[[package]]
 name = "polyval"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1644,9 +1644,9 @@ dependencies = [
 name = "quic-loopback"
 version = "0.1.0"
 dependencies = [
- "lann-quinn-wasi",
- "lann-tls-profile",
- "lann-tls-quinn",
+ "polymorph-quinn-wasi",
+ "polymorph-tls-profile",
+ "polymorph-tls-quinn",
  "quinn-proto",
  "rustls",
  "rustls-pki-types",
@@ -1658,8 +1658,8 @@ name = "quic-native-bench"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "lann-tls-profile",
- "lann-tls-quinn",
+ "polymorph-tls-profile",
+ "polymorph-tls-quinn",
  "quinn-proto",
  "rustls",
  "rustls-pki-types",
@@ -2222,10 +2222,10 @@ dependencies = [
  "ctr",
  "ed25519-dalek",
  "ghash",
- "lann-tls",
- "lann-tls-profile",
- "lann-tls-quinn",
  "p256",
+ "polymorph-tls",
+ "polymorph-tls-profile",
+ "polymorph-tls-quinn",
  "quinn-proto",
  "rustls",
  "rustls-pki-types",
@@ -2262,9 +2262,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 name = "tls-bench"
 version = "0.1.0"
 dependencies = [
- "lann-tls",
- "lann-tls-profile",
- "lann-tls-quinn",
+ "polymorph-tls",
+ "polymorph-tls-profile",
+ "polymorph-tls-quinn",
  "rustls",
  "rustls-pki-types",
 ]
@@ -2337,7 +2337,7 @@ name = "tls-virt-wasmtime"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "lann-tls",
+ "polymorph-tls",
  "rustls",
  "rustls-pki-types",
  "tls-virt-common",

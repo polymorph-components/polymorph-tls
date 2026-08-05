@@ -1,4 +1,4 @@
-//! Composed smoke test for the `lann:tls` component.
+//! Composed smoke test for the `polymorph:tls` component.
 //!
 //! One guest plays both endpoints: a `connector` and an `acceptor` from
 //! the composed TLS component, wired to each other by passing each side's
@@ -17,16 +17,16 @@ wit_bindgen::generate!({
     inline: "
         package inline:app;
         world app {
-            import lann:tls/types@0.1.0;
-            import lann:tls/client@0.1.0;
-            import lann:tls/server@0.1.0;
+            import polymorph:tls/types@0.1.0;
+            import polymorph:tls/client@0.1.0;
+            import polymorph:tls/server@0.1.0;
         }
     ",
     generate_all,
 });
 
-use lann::tls::client::Connector;
-use lann::tls::server::{Acceptor, Identity};
+use polymorph::tls::client::Connector;
+use polymorph::tls::server::{Acceptor, Identity};
 
 const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
 const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");
@@ -34,7 +34,7 @@ const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/le
 const P256_KEY_P8: &[u8] = include_bytes!("../../../rust/profile/src/testdata/p256-key.p8");
 
 const ALPN: &[u8] = b"tls-loopback/1";
-const MESSAGE: &[u8] = b"hello over the lann:tls component";
+const MESSAGE: &[u8] = b"hello over the polymorph:tls component";
 
 struct Component;
 

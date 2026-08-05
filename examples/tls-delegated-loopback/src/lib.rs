@@ -2,7 +2,7 @@
 //!
 //! Like `tls-loopback`, but the server identity is *delegated*: the TLS
 //! component holds only the certificate chain, and CertificateVerify is
-//! signed by the composed `lann:tls/signer` implementation. Also verifies
+//! signed by the composed `polymorph:tls/signer` implementation. Also verifies
 //! the in-guest Ed25519 posture still works alongside the signer import.
 //!
 //! Run composed under a runtime with component-model async enabled.
@@ -15,16 +15,16 @@ wit_bindgen::generate!({
     inline: "
         package inline:app;
         world app {
-            import lann:tls/types@0.1.0;
-            import lann:tls/client@0.1.0;
-            import lann:tls/server@0.1.0;
+            import polymorph:tls/types@0.1.0;
+            import polymorph:tls/client@0.1.0;
+            import polymorph:tls/server@0.1.0;
         }
     ",
     generate_all,
 });
 
-use lann::tls::client::Connector;
-use lann::tls::server::{Acceptor, Identity};
+use polymorph::tls::client::Connector;
+use polymorph::tls::server::{Acceptor, Identity};
 
 const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
 const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");

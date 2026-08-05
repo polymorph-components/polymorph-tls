@@ -23,49 +23,49 @@ smoke: smoke-quic smoke-tls smoke-tls-delegated
 smoke-quic: build-wasm
     wasmtime run -S inherit-network target/wasm32-wasip2/debug/quic-loopback.wasm
 
-# The composed lann:tls component (component-model async). The grep gate
-# asserts the composition satisfied every lann:tls import.
+# The composed polymorph:tls component (component-model async). The grep gate
+# asserts the composition satisfied every polymorph:tls import.
 smoke-tls: build-wasm
-    wac plug --plug target/wasm32-wasip2/debug/lann_tls_component.wasm target/wasm32-wasip2/debug/tls_loopback.wasm -o target/wasm32-wasip2/debug/tls-composed.wasm
-    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-composed.wasm | grep -q 'import lann:tls/'
+    wac plug --plug target/wasm32-wasip2/debug/polymorph_tls_component.wasm target/wasm32-wasip2/debug/tls_loopback.wasm -o target/wasm32-wasip2/debug/tls-composed.wasm
+    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-composed.wasm | grep -q 'import polymorph:tls/'
     wasmtime run -W component-model-async=y target/wasm32-wasip2/debug/tls-composed.wasm
 
 # The tls-delegated world with the composed test signer. The grep gates
 # assert the delegated artifact carries the signer import (the bridge is
 # reachable, not stripped) and that composition satisfies everything.
 smoke-tls-delegated:
-    cargo build -p lann-tls-component --features delegated-signer -p test-signer -p tls-delegated-loopback --target wasm32-wasip2
-    wasm-tools component wit target/wasm32-wasip2/debug/lann_tls_component.wasm | grep -q 'import lann:tls/signer'
-    wac plug --plug target/wasm32-wasip2/debug/test_signer.wasm target/wasm32-wasip2/debug/lann_tls_component.wasm -o target/wasm32-wasip2/debug/tls-delegated-with-signer.wasm
+    cargo build -p polymorph-tls-component --features delegated-signer -p test-signer -p tls-delegated-loopback --target wasm32-wasip2
+    wasm-tools component wit target/wasm32-wasip2/debug/polymorph_tls_component.wasm | grep -q 'import polymorph:tls/signer'
+    wac plug --plug target/wasm32-wasip2/debug/test_signer.wasm target/wasm32-wasip2/debug/polymorph_tls_component.wasm -o target/wasm32-wasip2/debug/tls-delegated-with-signer.wasm
     wac plug --plug target/wasm32-wasip2/debug/tls-delegated-with-signer.wasm target/wasm32-wasip2/debug/tls_delegated_loopback.wasm -o target/wasm32-wasip2/debug/tls-delegated-composed.wasm
-    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-composed.wasm | grep -q 'import lann:tls/'
+    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-composed.wasm | grep -q 'import polymorph:tls/'
     wasmtime run -W component-model-async=y target/wasm32-wasip2/debug/tls-delegated-composed.wasm
 
-# The tls-delegated world over a lann:webcrypto provider: clones and
+# The tls-delegated world over a polymorph:webcrypto provider: clones and
 # builds the sibling repository at the revision pinned alongside the
 # shim's vendored WIT. Heavier than `smoke`; run on demand.
 smoke-tls-webcrypto:
     #!/usr/bin/env bash
     set -euo pipefail
-    rev="$(cat examples/webcrypto-signer/wit/deps/lann-webcrypto/.pinned-rev)"
+    rev="$(cat examples/webcrypto-signer/wit/deps/polymorph-webcrypto/.pinned-rev)"
     checkout=target/webcrypto-src
     if [ ! -e "$checkout/.git" ]; then
-        git clone --filter=blob:none https://github.com/lann/component-webcrypto "$checkout"
+        git clone --filter=blob:none https://github.com/polymorph-components/polymorph-webcrypto "$checkout"
     fi
     git -C "$checkout" fetch -q origin "$rev"
     git -C "$checkout" checkout -q "$rev"
     # component-webcrypto's workspace expects a sibling checkout of
-    # lann/component-test (a dev-layout path dependency of its
+    # polymorph-components/polymorph-test (a dev-layout path dependency of its
     # conformance crates; the guest-provider build itself does not use it).
     if [ ! -e target/component-test/.git ]; then
-        git clone --filter=blob:none https://github.com/lann/component-test target/component-test
+        git clone --filter=blob:none https://github.com/polymorph-components/polymorph-test target/component-test
     fi
-    (cd "$checkout" && cargo build --release -p lann-webcrypto-guest-provider --target wasm32-wasip2)
-    cargo build -p lann-tls-component --features delegated-signer -p webcrypto-signer -p tls-delegated-loopback --target wasm32-wasip2
-    wac plug --plug "$checkout/target/wasm32-wasip2/release/lann_webcrypto_guest_provider.wasm" target/wasm32-wasip2/debug/webcrypto_signer.wasm -o target/wasm32-wasip2/debug/webcrypto-signer-with-provider.wasm
-    wac plug --plug target/wasm32-wasip2/debug/webcrypto-signer-with-provider.wasm target/wasm32-wasip2/debug/lann_tls_component.wasm -o target/wasm32-wasip2/debug/tls-delegated-webcrypto.wasm
+    (cd "$checkout" && cargo build --release -p polymorph-webcrypto-guest-provider --target wasm32-wasip2)
+    cargo build -p polymorph-tls-component --features delegated-signer -p webcrypto-signer -p tls-delegated-loopback --target wasm32-wasip2
+    wac plug --plug "$checkout/target/wasm32-wasip2/release/polymorph_webcrypto_guest_provider.wasm" target/wasm32-wasip2/debug/webcrypto_signer.wasm -o target/wasm32-wasip2/debug/webcrypto-signer-with-provider.wasm
+    wac plug --plug target/wasm32-wasip2/debug/webcrypto-signer-with-provider.wasm target/wasm32-wasip2/debug/polymorph_tls_component.wasm -o target/wasm32-wasip2/debug/tls-delegated-webcrypto.wasm
     wac plug --plug target/wasm32-wasip2/debug/tls-delegated-webcrypto.wasm target/wasm32-wasip2/debug/tls_delegated_loopback.wasm -o target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm
-    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm | grep -q 'import lann:'
+    ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm | grep -q 'import polymorph:'
     wasmtime run -W component-model-async=y target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm
 
 # Both tls-virt deliveries: the transparent-TLS sockets interposition

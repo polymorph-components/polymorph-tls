@@ -1,9 +1,9 @@
-# `lann:tls`
+# `polymorph:tls`
 
 A TLS 1.3 WIT package and pure-wasm implementation, designed to serve QUIC
 over `wasi:sockets`. A sibling of
-[`lann:webcrypto`](https://github.com/lann/component-webcrypto) and
-[`lann:webrtc-datachannels`](https://github.com/lann/webrtc-datachannels),
+[`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
+[`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 following the same architecture.
 
 **Status: spike implementation.** The WIT package, the profile and its
@@ -14,13 +14,13 @@ quic-go over real transports, and a scheduled dudect-style
 [timing lab](timing-lab/README.md), with the performance tradeoff
 measured in [`bench/`](bench/README.md). Upstreaming and the tls-virt
 follow-ons remain — see the
-[issue tracker](https://github.com/lann/component-tls/issues).
+[issue tracker](https://github.com/polymorph-components/polymorph-tls/issues).
 
 ## Why pure-wasm TLS 1.3 is plausible
 
 Whether an algorithm is safe to run in wasm is a timing-channel question.
 This repository inherits the class A–D classification from
-[`component-webcrypto`'s in-guest provider](https://github.com/lann/component-webcrypto/blob/main/rust/guest-provider/README.md)
+[`component-webcrypto`'s in-guest provider](https://github.com/polymorph-components/polymorph-webcrypto/blob/main/rust/guest-provider/README.md)
 — wasm makes no constant-time guarantee for any instruction, so algorithms
 are classed by how much their best software implementation must trust the
 machine below it, weighted by the blast radius of a small leak. TLS 1.3's

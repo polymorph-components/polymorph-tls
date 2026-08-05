@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// The `public-encryption` primitive kind: asymmetric encryption. Anyone
 /// holding the public key encrypts; only the private-key holder decrypts.
@@ -48,7 +48,7 @@ interface public-encryption {
         /// context bound into the padding: decryption succeeds only
         /// under the same label (WebCrypto's `RsaOaepParams.label`).
         /// A plaintext above the key's bound fails `error.extension`
-        /// — origin `"lann:webcrypto"`, name `"message-too-long"` —
+        /// — origin `"polymorph:webcrypto"`, name `"message-too-long"` —
         /// the signal to switch to hybrid wrapping (encrypt a symmetric
         /// key, wrap the payload under it).
         encrypt: async func(label: option<list<u8>>, plaintext: list<u8>) -> result<list<u8>, error>;
@@ -70,6 +70,12 @@ interface public-encryption {
         /// The key's length in bits for algorithms parameterized by one
         /// (the RSA modulus length).
         algorithm-length: func() -> option<u32>;
+
+        /// The public exponent for RSA-family keys, as WebCrypto's
+        /// `RsaKeyAlgorithm.publicExponent` denominates it: the
+        /// exponent's big-endian bytes (`[1, 0, 1]` for 65537). `none`
+        /// for algorithms without one.
+        algorithm-public-exponent: func() -> option<list<u8>>;
 
         /// The public key material, in the minting interface's documented
         /// public format; algorithms without a raw public form (the RSA
@@ -112,6 +118,9 @@ interface public-encryption {
 
         /// See `encryption-key.algorithm-length`.
         algorithm-length: func() -> option<u32>;
+
+        /// See `encryption-key.algorithm-public-exponent`.
+        algorithm-public-exponent: func() -> option<list<u8>>;
 
         /// Whether this key may `decrypt`. See
         /// `decryption-key-options.can-decrypt`.

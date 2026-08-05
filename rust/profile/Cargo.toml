@@ -1,5 +1,5 @@
 [package]
-name = "lann-tls-profile"
+name = "polymorph-tls-profile"
 description = "The wasm-safe TLS 1.3 algorithm profile: policy as data, plus identity types that keep class-D private keys out of the guest"
 version.workspace = true
 edition.workspace = true

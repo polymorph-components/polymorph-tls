@@ -18,8 +18,8 @@ plain `std::net` Rust guest (`examples/tls-virt-demo-p2`) — std on
 wasm32-wasip2 sits on the 0.2 interfaces — tunnels the same way, with
 no wasm-specific code at all.
 
-The tunnel's TLS runs the `lann-tls` profile configs natively
-(tokio-rustls carrying `lann_tls::client_config`), so the algorithm
+The tunnel's TLS runs the `polymorph-tls` profile configs natively
+(tokio-rustls carrying `polymorph_tls::client_config`), so the algorithm
 profile stays the single policy source; the smoke rig gates that the
 offered cipher suites are the profile's, verbatim.
 

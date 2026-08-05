@@ -1,6 +1,6 @@
 [package]
 name = "tls-loopback"
-description = "Composed smoke test: client and server TLS over the lann:tls component, wired stream-to-stream"
+description = "Composed smoke test: client and server TLS over the polymorph:tls component, wired stream-to-stream"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

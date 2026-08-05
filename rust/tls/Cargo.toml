@@ -1,12 +1,12 @@
 [package]
-name = "lann-tls"
+name = "polymorph-tls"
 description = "The profile's curated TLS 1.3 delivery: a pure-RustCrypto rustls provider and preconfigured TLS configs, with class-D signing structurally excluded"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-lann-tls-profile = { workspace = true }
+polymorph-tls-profile = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 rustls-rustcrypto = { workspace = true }

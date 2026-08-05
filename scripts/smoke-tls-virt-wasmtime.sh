@@ -7,7 +7,7 @@
 # legs dial a `.tls-virt.alt` name against `openssl s_server -rev` and
 # gate that the resolver returned a handle address (fd00::/8), the
 # reversed echo verified with clean closes, and openssl saw exactly the
-# profile's cipher suites (the host TLS runs the lann-tls configs, not a
+# profile's cipher suites (the host TLS runs the polymorph-tls configs, not a
 # stock provider). Passthrough legs dial an unsuffixed name against a
 # plain-TCP reverse echo and gate that delegation to wasmtime-wasi
 # carries an entire connection. The 0.2 legs run a plain `std::net`
@@ -52,7 +52,7 @@ tunnel_leg() {
     grep -q 'reversed echo verified' "$work/demo.log"
     grep -q 'Ciphersuite: TLS_' "$work/s_server.log"
     # The offered suites are the profile's, verbatim: the tunnel runs
-    # the lann-tls configs.
+    # the polymorph-tls configs.
     grep -q 'Client cipher list: TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256' \
         "$work/s_server.log"
 }

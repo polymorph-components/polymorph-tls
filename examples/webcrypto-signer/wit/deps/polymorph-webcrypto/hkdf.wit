@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// HKDF (RFC 5869) input keying material: the hash-independent half of
 /// the HKDF surface. The `ikm` resource minted here parameterizes

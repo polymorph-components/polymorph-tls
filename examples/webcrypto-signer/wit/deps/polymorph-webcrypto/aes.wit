@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// The AES family's shared parameterization. Interfaces minting AES-based
 /// keys (`aes-gcm`, `aes-cbc`, …) declare their variant from

@@ -1,6 +1,6 @@
 [package]
 name = "test-signer"
-description = "Test implementation of lann:tls/signer: signs with a fixture Ed25519 key, standing in for a key held outside the guest"
+description = "Test implementation of polymorph:tls/signer: signs with a fixture Ed25519 key, standing in for a key held outside the guest"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -7,9 +7,9 @@ publish = false
 description = "dudect-style timing lab: statistical leakage tests of the TLS/QUIC deliveries' protocol-level secret-bearing surfaces, run in-guest under wasmtime."
 
 [dependencies]
-lann-tls = { workspace = true }
-lann-tls-profile = { workspace = true }
-lann-tls-quinn = { workspace = true }
+polymorph-tls = { workspace = true }
+polymorph-tls-profile = { workspace = true }
+polymorph-tls-quinn = { workspace = true }
 quinn-proto = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }

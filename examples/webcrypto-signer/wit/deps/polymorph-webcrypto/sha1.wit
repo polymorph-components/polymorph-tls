@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// SHA-1 digests with collision-attack detection (`sha1-checked`, after
 /// the RustCrypto packaging of the Stevens–Karpman counter-cryptanalysis
@@ -43,7 +43,7 @@ interface sha1-checked {
     use digest.{digest};
 
     /// Mint a SHA-1 digest that *rejects* on a detected collision attack:
-    /// `compute` fails with `error.extension` — origin `"lann:webcrypto"`,
+    /// `compute` fails with `error.extension` — origin `"polymorph:webcrypto"`,
     /// name `"collision-detected"` — for input carrying an attack
     /// pattern, and returns the standard SHA-1 digest for everything
     /// else. Choose this posture to surface an attack as a diagnosable

@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// Shared structural types for the WebCrypto-style interfaces.
 ///
@@ -22,7 +22,7 @@ interface types {
     record extension-error {
         /// The namespace the condition is defined under: an opaque string
         /// owned by the defining party, by convention its package name,
-        /// e.g. `"lann:webcrypto"`. Ownership means names cannot collide:
+        /// e.g. `"polymorph:webcrypto"`. Ownership means names cannot collide:
         /// third-party providers mint conditions under their own
         /// namespace, never under another party's.
         origin: string,
@@ -657,6 +657,12 @@ interface signature {
         /// ECDSA, whose key size is fixed by the algorithm or curve.
         algorithm-length: func() -> option<u32>;
 
+        /// The public exponent for RSA-family keys, as WebCrypto's
+        /// `RsaKeyAlgorithm.publicExponent` denominates it: the
+        /// exponent's big-endian bytes (`[1, 0, 1]` for 65537). `none`
+        /// for algorithms without one (Ed25519, ECDSA).
+        algorithm-public-exponent: func() -> option<list<u8>>;
+
         /// The public key material, in the minting interface's documented
         /// public format. Algorithms without a raw public form (the RSA
         /// family — the platform serves `spki` and `jwk` only) fail
@@ -702,6 +708,9 @@ interface signature {
 
         /// See `verifying-key.algorithm-length`.
         algorithm-length: func() -> option<u32>;
+
+        /// See `verifying-key.algorithm-public-exponent`.
+        algorithm-public-exponent: func() -> option<list<u8>>;
 
         /// Whether the export functions may return this key's material.
         /// Mint-time recorded policy, which platform-backed key storage

@@ -26,7 +26,7 @@ mod stats;
 use std::sync::Arc;
 use std::time::Instant;
 
-use lann_tls_profile::RpkIdentity;
+use polymorph_tls_profile::RpkIdentity;
 use rustls::crypto::cipher::{
     InboundOpaqueMessage, MessageDecrypter, MessageEncrypter, OutboundChunks, OutboundPlainMessage,
 };
@@ -369,7 +369,7 @@ const HKDF_KAT_OKM: [u8; 32] =
 
 /// A raw-public-key config pair under `provider`: the client pins the
 /// server's key, the server authenticates with `identity`, clients are
-/// unauthenticated. Assembled from the `lann_tls::rpk` building blocks
+/// unauthenticated. Assembled from the `polymorph_tls::rpk` building blocks
 /// rather than its `client_config`/`server_config` so the lab can restrict
 /// the provider's cipher suites and skip client authentication — client
 /// CertificateVerify work is class-independent here and would only widen
@@ -380,8 +380,8 @@ fn rpk_pair(
     extract_secrets: bool,
 ) -> Result<(Arc<ClientConfig>, Arc<ServerConfig>), String> {
     let algorithms = provider.signature_verification_algorithms;
-    let certified =
-        lann_tls::rpk::certified_key(identity).map_err(|e| format!("rpk certified key: {e}"))?;
+    let certified = polymorph_tls::rpk::certified_key(identity)
+        .map_err(|e| format!("rpk certified key: {e}"))?;
     let mut server = ServerConfig::builder_with_provider(provider.clone())
         .with_protocol_versions(&[&rustls::version::TLS13])
         .map_err(|e| format!("server config versions: {e}"))?
@@ -397,7 +397,7 @@ fn rpk_pair(
         .with_protocol_versions(&[&rustls::version::TLS13])
         .map_err(|e| format!("client config versions: {e}"))?
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(lann_tls::rpk::RpkServerVerifier::new(
+        .with_custom_certificate_verifier(Arc::new(polymorph_tls::rpk::RpkServerVerifier::new(
             &identity.public_key(),
             algorithms,
         )))
@@ -410,7 +410,7 @@ fn rpk_pair(
 /// handshake negotiates exactly the suite whose record machinery a surface
 /// measures.
 fn provider_with_suite(id: rustls::CipherSuite) -> Arc<CryptoProvider> {
-    let base = lann_tls::provider();
+    let base = polymorph_tls::provider();
     let suite = *base
         .cipher_suites
         .iter()
@@ -693,7 +693,7 @@ fn run_lab() -> Result<(), String> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(0x6c61_6e6e_5f74_6c73);
     let mut rng = Rng::new(seed);
-    let provider = lann_tls::provider();
+    let provider = polymorph_tls::provider();
 
     let mut expected = vec![0u8; COMPARE_LEN];
     rng.fill(&mut expected);
@@ -1113,13 +1113,13 @@ fn run_lab() -> Result<(), String> {
             "packet/chacha20-poly1305/open-reject",
             "packet/chacha20-poly1305/seal",
             "packet/chacha20-poly1305/hp-mask",
-            lann_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
+            polymorph_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
         ),
         (
             "packet/aes-128-gcm/open-reject",
             "packet/aes-128-gcm/seal",
             "packet/aes-128-gcm/hp-mask",
-            lann_tls_quinn::TLS13_AES_128_GCM_SHA256,
+            polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256,
         ),
     ] {
         let rig = packet_rig(suite, &mut rng)?;
@@ -1210,7 +1210,7 @@ fn run_lab() -> Result<(), String> {
     // under a long-lived key on unauthenticated Initial packets.
     {
         use quinn_proto::crypto::HandshakeTokenKey;
-        let token_key = lann_tls_quinn::TokenKey::new(b"timing-lab token master");
+        let token_key = polymorph_tls_quinn::TokenKey::new(b"timing-lab token master");
         let aead = token_key.aead_from_hkdf(b"timing-lab token");
         let mut token = vec![0u8; TAG_PROBE_LEN];
         rng.fill(&mut token);
@@ -1369,7 +1369,7 @@ fn run_lab() -> Result<(), String> {
 
         // The packet seal under mask prep.
         {
-            let rig = packet_rig(lann_tls_quinn::TLS13_AES_128_GCM_SHA256, &mut rng)?;
+            let rig = packet_rig(polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256, &mut rng)?;
             let mut random = vec![0u8; SEAL_LEN];
             let mut work = vec![0u8; SEAL_LEN];
             let mut inputs = Rng::new(rng.next_u64());

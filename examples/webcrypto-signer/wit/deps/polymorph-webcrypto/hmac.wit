@@ -1,4 +1,4 @@
-package lann:webcrypto@0.1.0;
+package polymorph:webcrypto@0.1.0;
 
 /// HMAC key minting (RFC 2104) over the SHA-2 hash family (FIPS 180-4).
 ///

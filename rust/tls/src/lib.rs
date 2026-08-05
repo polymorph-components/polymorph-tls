@@ -1,6 +1,6 @@
 //! The profile's curated TLS 1.3 delivery for Rust guests.
 //!
-//! This crate turns the policy in [`lann_tls_profile`] into working rustls
+//! This crate turns the policy in [`polymorph_tls_profile`] into working rustls
 //! machinery, all of it pure RustCrypto and wasm-safe per the profile's
 //! timing classification:
 //!
@@ -18,7 +18,7 @@
 //! opinions bind only its users: dropping to rustls directly is always
 //! possible, and out of scope here. The one rule this crate can make
 //! unrepresentable is the signing rule — no constructor accepts ECDSA or
-//! RSA private key material; see [`lann_tls_profile::ServerIdentity`].
+//! RSA private key material; see [`polymorph_tls_profile::ServerIdentity`].
 //!
 //! QUIC integration (quinn compatibility) deliberately lives elsewhere:
 //! this crate is TLS only.
@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 pub mod rpk;
 
-use lann_tls_profile::ServerIdentity;
+use polymorph_tls_profile::ServerIdentity;
 use rustls::crypto::{CryptoProvider, KeyProvider};
 use rustls::server::ResolvesServerCert;
 use rustls::sign::CertifiedKey;
@@ -37,15 +37,15 @@ use rustls_pki_types::PrivateKeyDer;
 /// The profile's `CryptoProvider`.
 ///
 /// Cipher suites and key-exchange groups are exactly
-/// [`lann_tls_profile::CIPHER_SUITES`] and
-/// [`lann_tls_profile::KEY_EXCHANGE_GROUPS`], in profile preference order.
+/// [`polymorph_tls_profile::CIPHER_SUITES`] and
+/// [`polymorph_tls_profile::KEY_EXCHANGE_GROUPS`], in profile preference order.
 /// Signature verification carries rustls-rustcrypto's full (secret-free)
 /// algorithm set. The key loader accepts only Ed25519 keys: loading ECDSA
 /// or RSA private key material fails rather than producing an in-guest
 /// class-D signer.
 pub fn provider() -> Arc<CryptoProvider> {
     let base = rustls_rustcrypto::provider();
-    let cipher_suites = lann_tls_profile::CIPHER_SUITES
+    let cipher_suites = polymorph_tls_profile::CIPHER_SUITES
         .iter()
         .map(|id| {
             *base
@@ -55,7 +55,7 @@ pub fn provider() -> Arc<CryptoProvider> {
                 .expect("rustls-rustcrypto provides every profile cipher suite")
         })
         .collect();
-    let kx_groups = lann_tls_profile::KEY_EXCHANGE_GROUPS
+    let kx_groups = polymorph_tls_profile::KEY_EXCHANGE_GROUPS
         .iter()
         .map(|group| {
             *base
@@ -105,7 +105,7 @@ pub fn client_config(roots: rustls::RootCertStore) -> rustls::ClientConfig {
 ///
 /// The identity carries the signing policy: an Ed25519 key signing
 /// in-guest, or a delegated external signer. See
-/// [`lann_tls_profile::ServerIdentity`].
+/// [`polymorph_tls_profile::ServerIdentity`].
 pub fn server_config(identity: ServerIdentity) -> Result<rustls::ServerConfig, rustls::Error> {
     let builder = rustls::ServerConfig::builder_with_provider(provider())
         .with_protocol_versions(&[&rustls::version::TLS13])
@@ -146,9 +146,9 @@ mod tests {
     fn provider_matches_profile() {
         let provider = provider();
         let suites: Vec<_> = provider.cipher_suites.iter().map(|s| s.suite()).collect();
-        assert_eq!(suites, lann_tls_profile::CIPHER_SUITES);
+        assert_eq!(suites, polymorph_tls_profile::CIPHER_SUITES);
         let groups: Vec<_> = provider.kx_groups.iter().map(|g| g.name()).collect();
-        assert_eq!(groups, lann_tls_profile::KEY_EXCHANGE_GROUPS);
+        assert_eq!(groups, polymorph_tls_profile::KEY_EXCHANGE_GROUPS);
     }
 
     /// Guards the class-D key rejection: the provider's key loader must

@@ -1,6 +1,6 @@
 [package]
-name = "lann-tls-component"
-description = "The lann:tls component: the profile's enforced delivery over component-model async streams"
+name = "polymorph-tls-component"
+description = "The polymorph:tls component: the profile's enforced delivery over component-model async streams"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,8 +15,8 @@ crate-type = ["cdylib", "rlib"]
 delegated-signer = []
 
 [dependencies]
-lann-tls = { workspace = true }
-lann-tls-profile = { workspace = true }
+polymorph-tls = { workspace = true }
+polymorph-tls-profile = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 wit-bindgen = { workspace = true }

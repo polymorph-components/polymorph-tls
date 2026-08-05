@@ -1,7 +1,7 @@
-# `lann-tls-quinn`
+# `polymorph-tls-quinn`
 
 quinn compatibility for the profile. The repository's primary artifact is
-TLS ([`lann-tls`](../tls/README.md) is the curated core); this crate is
+TLS ([`polymorph-tls`](../tls/README.md) is the curated core); this crate is
 the QUIC leg, kept out of the core library's dependency graph: everything
 quinn-proto needs to run the profile's TLS 1.3 over QUIC.
 
@@ -34,7 +34,7 @@ mandates (ALPN required, RFC 9001 §8.1; `max_early_data_size` of
 `u32::MAX`). Both trust models are served: WebPKI
 (`client_config`/`server_config`) and mutually authenticated raw public
 keys (`rpk_client_config`/`rpk_server_config`, RFC 7250) — see
-[`lann-tls`'s `rpk` module](../tls/README.md) for the trust contract.
+[`polymorph-tls`'s `rpk` module](../tls/README.md) for the trust contract.
 
 ## Timing notes beyond the core table
 
