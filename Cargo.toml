@@ -16,6 +16,9 @@ members = [
     "examples/tls-tcp",
     "examples/tls-virt-demo",
     "examples/tls-virt-demo-p2",
+    "bench/tls-bench",
+    "bench/tls-component-bench",
+    "bench/quic-native-bench",
 ]
 resolver = "2"
 

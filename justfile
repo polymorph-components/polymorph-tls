@@ -83,6 +83,12 @@ smoke-tls-virt-wasmtime: build-wasm
     cargo build -p tls-virt-wasmtime
     scripts/smoke-tls-virt-wasmtime.sh
 
+# The performance battery: native, wasm, and composed-component rows
+# with a provenance-stamped report on stdout. Non-gating; see
+# bench/README.md. Capture with: just bench > bench/results/<name>.md
+bench:
+    scripts/bench.sh
+
 # Binary audit: no table-based AES in the release wasm artifact.
 audit:
     cargo build -p quic-loopback --target wasm32-wasip2 --release

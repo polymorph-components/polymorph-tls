@@ -54,8 +54,12 @@ design record.
   demo guests: the wasip3 app both tls-virt rigs run unmodified, and
   the `std::net` app (`wasi:sockets@0.2.x` via Rust std) for the
   wasmtime delivery's 0.2 interposition.
+- `bench/` — the performance battery (tls-bench, tls-component-bench,
+  quic-native-bench) and its captured, provenance-stamped reports in
+  `bench/results/`; its README records methodology and caveats.
 - `scripts/` — audit helper, the interop harnesses (with their Go
-  peer in `scripts/interop/peer`), and the tls-virt smoke harnesses.
+  peer in `scripts/interop/peer`), the tls-virt smoke harnesses, and
+  the bench runner.
 
 ## Checks
 
@@ -66,6 +70,7 @@ design record.
 | `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider on both sockets generations — wasip3 and `std::net`/0.2 guests — with handle-address and profile-cipher-suite gates plus plain-TCP passthrough-delegation legs |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
+| `just bench` | non-gating: the performance battery (packet protection, handshakes, record-path and QUIC bulk; native vs wasm vs composed component) with provenance-stamped output |
 
 Two invariants are already fixed:
 

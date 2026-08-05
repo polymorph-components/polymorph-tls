@@ -13,6 +13,11 @@
 //! quic-loopback server <ip> <port> <leaf-der> <key-p8>
 //! ```
 //!
+//! With `bench <mib>`, runs a loopback bulk-throughput benchmark: one
+//! connection, fresh unidirectional transfers of `<mib>` MiB per batch
+//! over bidirectional streams, reporting the median batch as a
+//! `bench,quic-bulk,...` row (see `bench/README.md`).
+//!
 //! Exit status is the verdict; run under a WASI runtime with network
 //! access (e.g. `wasmtime run -S inherit-network`).
 
@@ -61,10 +66,16 @@ mod run {
                 client(&args[2], &args[3], &args[4], &args[5], &args[6])
             }
             Some("server") if args.len() == 6 => server(&args[2], &args[3], &args[4], &args[5]),
+            Some("bench") if args.len() == 3 => bench(
+                args[2]
+                    .parse()
+                    .unwrap_or_else(|e| die(format!("mib {:?}: {e}", args[2]))),
+            ),
             _ => {
                 eprintln!(
-                    "usage: {0}\n       {0} client <ip> <port> <server-name> <ca-der> <payload>\
-                     \n       {0} server <ip> <port> <leaf-der> <key-p8>",
+                    "usage: {0}       {0} client <ip> <port> <server-name> <ca-der> <payload>\
+                            {0} server <ip> <port> <leaf-der> <key-p8>\
+                            {0} bench <mib>",
                     args.first().map(String::as_str).unwrap_or("quic-loopback"),
                 );
                 std::process::exit(2);
@@ -464,5 +475,183 @@ mod run {
         println!("idle timeout observed on both sides");
 
         println!("loopback OK");
+    }
+
+    /// Reads and discards all currently available data from `id`;
+    /// returns the byte count and whether the stream finished.
+    fn drain_stream(conn: &mut quinn_proto::Connection, id: StreamId) -> (usize, bool) {
+        let mut recv = conn.recv_stream(id);
+        let mut n = 0;
+        let mut fin = false;
+        if let Ok(mut chunks) = recv.read(false) {
+            loop {
+                match chunks.next(usize::MAX) {
+                    Ok(Some(chunk)) => n += chunk.bytes.len(),
+                    Ok(None) => {
+                        fin = true;
+                        break;
+                    }
+                    Err(_) => break,
+                }
+            }
+            let _ = chunks.finalize();
+        }
+        (n, fin)
+    }
+
+    /// Loopback bulk throughput: the wasm leg of the QUIC end-to-end
+    /// benchmark (`bench/README.md`). One connection under
+    /// bench-tuned flow-control windows; a warmup transfer, then
+    /// batches of `mib` MiB, each over a fresh bidirectional stream.
+    fn bench(mib: usize) {
+        const BATCHES: usize = 3;
+        let bytes = mib * 1024 * 1024;
+
+        let mut transport = TransportConfig::default();
+        transport.max_idle_timeout(Some(VarInt::from_u32(30_000).into()));
+        let transport = Arc::new(transport);
+
+        let local = |port| SocketAddr::new(Ipv6Addr::LOCALHOST.into(), port);
+        let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
+            lann_tls_quinn::ResetKey::new(b"bench reset key"),
+        )));
+        let identity = Ed25519Identity::from_pkcs8_der(
+            vec![CertificateDer::from(LEAF_DER.to_vec())],
+            LEAF_KEY_P8,
+        )
+        .expect("leaf key is Ed25519");
+        let tls_server = lann_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
+            .expect("server config");
+        let quic_server: lann_tls_quinn::QuicServerConfig =
+            tls_server.try_into().expect("initial suite");
+        let mut server_config = ServerConfig::new(
+            Arc::new(quic_server),
+            Arc::new(lann_tls_quinn::TokenKey::new(b"bench token key")),
+        );
+        server_config.transport = transport.clone();
+        let mut server = Driver::new(
+            Endpoint::new(
+                endpoint_config.clone(),
+                Some(Arc::new(server_config)),
+                true,
+                None,
+            ),
+            UdpSocket::bind(local(0)).expect("bind server socket"),
+        );
+
+        let mut roots = rustls::RootCertStore::empty();
+        roots
+            .add(CertificateDer::from(CA_DER.to_vec()))
+            .expect("CA parses");
+        let quic_client: lann_tls_quinn::QuicClientConfig =
+            lann_tls_quinn::client_config(roots, ALPN)
+                .try_into()
+                .expect("initial suite");
+        let mut client_config = ClientConfig::new(Arc::new(quic_client));
+        client_config.transport_config(transport);
+        let mut client = Driver::new(
+            Endpoint::new(endpoint_config, None, true, None),
+            UdpSocket::bind(local(0)).expect("bind client socket"),
+        );
+
+        let server_addr = server.local_addr();
+        let client_handle = client
+            .connect(client_config, server_addr, "localhost")
+            .expect("connect");
+
+        let mut client_connected = false;
+        let mut server_handle: Option<ConnectionHandle> = None;
+        drive(&mut client, &mut server, |c, s| {
+            while let Some((_, event)) = c.poll_event() {
+                if matches!(event, Event::Connected) {
+                    client_connected = true;
+                }
+            }
+            while let Some((handle, event)) = s.poll_event() {
+                if matches!(event, Event::Connected) {
+                    server_handle = Some(handle);
+                }
+            }
+            (client_connected && server_handle.is_some()).then_some(())
+        });
+        let server_handle = server_handle.unwrap();
+
+        let mut transfer = |bytes: usize| -> f64 {
+            let chunk = vec![0xa5u8; 64 * 1024];
+            let id = {
+                let conn = client.connection_mut(client_handle).expect("client conn");
+                conn.streams().open(Dir::Bi).expect("open stream")
+            };
+            let mut written = 0usize;
+            let mut finished = false;
+            let mut received = 0usize;
+            let mut fin_seen = false;
+            let mut accepted: Option<StreamId> = None;
+            let start = Instant::now();
+            drive(&mut client, &mut server, |c, s| {
+                while let Some((_, event)) = c.poll_event() {
+                    if let Event::ConnectionLost { reason } = event {
+                        die(format!("client connection lost: {reason} (written={written} finished={finished})"));
+                    }
+                }
+                while let Some((_, event)) = s.poll_event() {
+                    if let Event::ConnectionLost { reason } = event {
+                        die(format!(
+                            "server connection lost: {reason} (received={received} fin={fin_seen})"
+                        ));
+                    }
+                }
+
+                if written < bytes || !finished {
+                    let conn = c.connection_mut(client_handle).expect("client conn");
+                    let mut stream = conn.send_stream(id);
+                    while written < bytes {
+                        let want = (bytes - written).min(chunk.len());
+                        match stream.write(&chunk[..want]) {
+                            Ok(0) => break,
+                            Ok(n) => written += n,
+                            Err(quinn_proto::WriteError::Blocked) => break,
+                            Err(e) => die(format!("stream write: {e}")),
+                        }
+                    }
+                    if written >= bytes && !finished {
+                        stream.finish().expect("finish");
+                        finished = true;
+                    }
+                    // The writes above queued stream data after this
+                    // iteration's pump; collect it into transmits now so
+                    // the wait below has something to wake on.
+                    while c.pump().expect("client pump") {}
+                }
+
+                let conn = s.connection_mut(server_handle).expect("server conn");
+                if accepted.is_none() {
+                    accepted = conn.streams().accept(Dir::Bi);
+                }
+                if let Some(id) = accepted {
+                    let (n, fin) = drain_stream(conn, id);
+                    if n > 0 {
+                        received += n;
+                        // Draining freed flow-control credit; flush the
+                        // resulting frames for the same reason as above.
+                        while s.pump().expect("server pump") {}
+                    }
+                    fin_seen |= fin;
+                }
+                (fin_seen && received >= bytes).then_some(())
+            });
+            bytes as f64 / start.elapsed().as_secs_f64() / 1e6
+        };
+
+        // Warmup, then measured batches.
+        transfer((bytes / 4).max(1024 * 1024));
+        let mut rates: Vec<f64> = (0..BATCHES).map(|_| transfer(bytes)).collect();
+        rates.sort_by(|a, b| a.total_cmp(b));
+        println!(
+            "bench,quic-bulk,loopback,MB/s,{:.1},{:.1},{:.1}",
+            rates[rates.len() / 2],
+            rates[0],
+            rates[rates.len() - 1],
+        );
     }
 }

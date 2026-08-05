@@ -1,0 +1,15 @@
+[package]
+name = "quic-native-bench"
+description = "Native mirror of the quic-loopback bench mode: the same quinn-proto + profile stack over std::net UDP, isolating the wasm-vs-native delta"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+lann-tls-profile = { workspace = true }
+lann-tls-quinn = { workspace = true }
+quinn-proto = { workspace = true }
+bytes = "1"
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }

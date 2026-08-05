@@ -1,0 +1,15 @@
+[package]
+name = "tls-component-bench"
+description = "Benchmark guest for the composed lann:tls component: record-path bulk throughput and handshakes across the component boundary"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasip3 = { workspace = true }
+futures = { workspace = true }
+wit-bindgen = { version = "0.57", features = ["async"] }

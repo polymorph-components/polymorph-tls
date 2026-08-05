@@ -92,20 +92,30 @@ owns.
 
 ## Performance posture
 
-Honest expectations, to be replaced by measurements (the documented
-tradeoff is a deliverable, not a caveat):
+Measured, not estimated (`just bench`; methodology, caveats, and
+provenance-stamped numbers in [`bench/`](bench/README.md)):
 
-- wasm has no AES-NI and no carryless multiply, so fixsliced AES-GCM plus
-  software GHASH runs an order of magnitude or more off native hardware;
-  ChaCha20-Poly1305 fares much better and is preferred for exactly this
-  reason.
-- QUIC pays per-packet AEAD, and no kTLS/GSO offload is reachable from
-  `wasi:sockets` (datagram batching only). Suitable for control planes and
-  moderate throughput, not line rate.
-- Component-boundary copies are noise relative to in-wasm crypto: the
-  canonical ABI transfers at memcpy cost (a fraction of a cycle per byte)
-  against tens of cycles per byte for the ciphers. The tradeoff that
-  matters is wasm versus native, not library versus component.
+- The AEAD gap is the wasm story. Fixsliced AES-128-GCM plus software
+  GHASH runs roughly 25x off native hardware AES at QUIC packet sizes;
+  ChaCha20-Poly1305 runs within about 2x of native and roughly 3x
+  faster than AES inside wasm. The profile's ChaCha-first preference
+  order is this measurement, applied. `+simd128` improves ChaCha by a
+  further ~15-20% and AES by single digits; it changes no ordering.
+- Componentization is cheap where it matters: pushing the record path
+  through the composed component costs about a tenth of the in-guest
+  library's throughput, against the multiples lost to being in wasm at
+  all — the tradeoff that matters remains wasm versus native, not
+  library versus component. Connection setup pays more (roughly 2.4x
+  fewer handshakes/s than the in-guest library) from per-connection
+  stream and resource churn.
+- QUIC pays per-packet AEAD and per-datagram I/O, with no kTLS/GSO
+  offload reachable from `wasi:sockets` (datagram batching only): wasm
+  loopback throughput lands within 2x of the same stack running
+  natively, both well below the record path. Suitable for control
+  planes and moderate throughput, not line rate.
+- Handshakes (Ed25519 identity) run at thousands per second in wasm,
+  roughly 2x off native: connection setup is not the bottleneck for
+  the deployment shapes this repository targets.
 
 ## Threat model
 
