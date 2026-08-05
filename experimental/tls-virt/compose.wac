@@ -1,0 +1,29 @@
+// Composition for the tls-virt demo rig.
+//
+// Three components, one chain: the demo app speaks plain `wasi:sockets`;
+// its sockets imports are rewired onto the virtualizer's structurally
+// identical `virt:sockets` exports (the rename exists so this assignment
+// can be written while the virtualizer's own `wasi:sockets` imports pass
+// through to the host); the virtualizer tunnels suffix-opted connections
+// through the `lann:tls` client.
+package lann:tls-virt-composed;
+
+// The TLS provider. Its wasi imports pass through to the host.
+let tls = new lann:tls-component { ... };
+
+// The virtualizer: TLS from the `lann:tls` instance; real sockets and
+// name lookup from the host.
+let virt = new lann:tls-virt {
+    "lann:tls/types@0.1.0": tls["lann:tls/types@0.1.0"],
+    "lann:tls/client@0.1.0": tls["lann:tls/client@0.1.0"],
+    ...
+};
+
+// The demo app: every socket it can see is the virtualizer's.
+let demo = new lann:tls-virt-demo {
+    "wasi:sockets/types@0.3.0": virt["virt:sockets/types@0.3.0"],
+    "wasi:sockets/ip-name-lookup@0.3.0": virt["virt:sockets/ip-name-lookup@0.3.0"],
+    ...
+};
+
+export demo["wasi:cli/run@0.3.0"];

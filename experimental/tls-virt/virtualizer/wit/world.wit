@@ -1,0 +1,27 @@
+package lann:tls-virt@0.1.0;
+
+/// The host-facing side of the virtualizer: the real sockets it delegates
+/// to and the composed `lann:tls` client that drives tunneled connections.
+///
+/// This world and `virtualizer-exports` are two halves of one component,
+/// generated separately. See README.md for why the directions cannot share
+/// one world.
+world virtualizer-imports {
+    import wasi:sockets/types@0.3.0;
+    import wasi:sockets/ip-name-lookup@0.3.0;
+    import lann:tls/types@0.1.0;
+    import lann:tls/client@0.1.0;
+}
+
+/// The application-facing side of the virtualizer: a structurally
+/// identical copy of `wasi:sockets` under a different package name.
+///
+/// The rename exists for composition: `wac` rewires the consumer's
+/// `wasi:sockets` imports onto these exports by explicit assignment
+/// (structural typing makes the name difference immaterial), while the
+/// virtualizer's own `wasi:sockets` imports continue to the host. See
+/// compose.wac.
+world virtualizer-exports {
+    export virt:sockets/types@0.3.0;
+    export virt:sockets/ip-name-lookup@0.3.0;
+}

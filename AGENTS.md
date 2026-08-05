@@ -40,6 +40,10 @@ design record.
   the shim adapting a `lann:webcrypto` provider to `lann:tls/signer`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
+- `experimental/` — prototypes, per its README's contract (no
+  stability, not in the default gates): `tls-virt` is a `wasi:sockets`
+  virtualizer adding transparent TLS via the composed `lann:tls`
+  client, with its own demo, composition, and smoke script.
 - `scripts/` — audit helper and the interop harnesses (with their Go
   peer in `scripts/interop/peer`).
 

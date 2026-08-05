@@ -68,6 +68,11 @@ smoke-tls-webcrypto:
     ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm | grep -q 'import lann:'
     wasmtime run -W component-model-async=y target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm
 
+# The experimental tls-virt rig: the composed virtualizer demo against
+# openssl s_server over real TCP. On demand; not part of `smoke`.
+smoke-tls-virt: build-wasm
+    experimental/tls-virt/smoke.sh
+
 # Binary audit: no table-based AES in the release wasm artifact.
 audit:
     cargo build -p quic-loopback --target wasm32-wasip2 --release

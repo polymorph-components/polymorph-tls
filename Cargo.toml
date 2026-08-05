@@ -11,6 +11,8 @@ members = [
     "examples/test-signer",
     "examples/webcrypto-signer",
     "examples/tls-tcp",
+    "experimental/tls-virt/virtualizer",
+    "experimental/tls-virt/demo",
 ]
 resolver = "2"
 
