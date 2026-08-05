@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test for the tls-virt prototype: compose the demo app, the
+# Smoke rig for the tls-virt-guest delivery: compose the demo app, the
 # virtualizer, and the lann:tls component; run the composed component
 # against `openssl s_server -rev` on localhost. The demo speaks plain
 # TCP to a `.tls-virt.alt` name; every byte on the wire is TLS.
@@ -10,7 +10,7 @@
 # completed a TLS handshake; the demo verified the reversed echo and a
 # clean close in both directions.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 
 work=$(mktemp -d)
 cleanup() {
@@ -28,9 +28,9 @@ TESTDATA=rust/quinn/tests/testdata
 log "compose"
 wac compose \
     --dep lann:tls-component="$WASM/lann_tls_component.wasm" \
-    --dep lann:tls-virt="$WASM/tls_virt.wasm" \
+    --dep lann:tls-virt-guest="$WASM/tls_virt_guest.wasm" \
     --dep lann:tls-virt-demo="$WASM/tls_virt_demo.wasm" \
-    -o "$COMPOSED" experimental/tls-virt/compose.wac
+    -o "$COMPOSED" rust/tls-virt-guest/compose.wac
 ! wasm-tools component wit "$COMPOSED" | grep -qE 'import (lann:tls|virt:sockets)/'
 
 log "fixture PKI to PEM"
@@ -46,7 +46,7 @@ for _ in $(seq 1 100); do grep -q ACCEPT "$work/s_server.log" && break; sleep 0.
 log "composed demo dials localhost.tls-virt.alt:$port"
 timeout 60 wasmtime run -W component-model-async=y -S p3 \
     -S inherit-network -S allow-ip-name-lookup=y \
-    "$COMPOSED" localhost.tls-virt.alt "$port" tls-virt-smoke | tee "$work/demo.log"
+    "$COMPOSED" localhost.tls-virt.alt "$port" tls-virt-guest-smoke | tee "$work/demo.log"
 wait
 
 grep -q 'resolved localhost.tls-virt.alt -> fd' "$work/demo.log"
@@ -54,4 +54,4 @@ grep -q 'reversed echo verified' "$work/demo.log"
 grep -q 'Ciphersuite: TLS_' "$work/s_server.log"
 
 echo
-echo "tls-virt smoke OK"
+echo "tls-virt-guest smoke OK"

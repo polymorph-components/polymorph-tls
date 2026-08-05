@@ -14,7 +14,7 @@ test:
     cargo test --workspace
 
 build-wasm:
-    cargo build --workspace --target wasm32-wasip2
+    cargo build --workspace --exclude tls-virt-wasmtime --target wasm32-wasip2
 
 # All loopback smoke tests.
 smoke: smoke-quic smoke-tls smoke-tls-delegated
@@ -68,16 +68,20 @@ smoke-tls-webcrypto:
     ! wasm-tools component wit target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm | grep -q 'import lann:'
     wasmtime run -W component-model-async=y target/wasm32-wasip2/debug/tls-delegated-webcrypto-composed.wasm
 
-# The experimental tls-virt rig: the composed virtualizer demo against
-# openssl s_server over real TCP. On demand; not part of `smoke`.
-smoke-tls-virt: build-wasm
-    experimental/tls-virt/smoke.sh
+# Both tls-virt deliveries: the transparent-TLS sockets interposition
+# against openssl over real TCP. Needs openssl and python3; not part of
+# `smoke`.
+smoke-tls-virt: smoke-tls-virt-guest smoke-tls-virt-wasmtime
 
-# The experimental tls-virt-host rig: the same demo under the custom
-# wasmtime embedding (host-side wasi:sockets wrapper). On demand; not
-# part of `smoke`. Builds its own excluded crate.
-smoke-tls-virt-host:
-    experimental/tls-virt-host/smoke.sh
+# The composed guest virtualizer (tls-virt-guest).
+smoke-tls-virt-guest: build-wasm
+    scripts/smoke-tls-virt-guest.sh
+
+# The wasmtime host provider (tls-virt-wasmtime), including its
+# passthrough-delegation leg.
+smoke-tls-virt-wasmtime: build-wasm
+    cargo build -p tls-virt-wasmtime
+    scripts/smoke-tls-virt-wasmtime.sh
 
 # Binary audit: no table-based AES in the release wasm artifact.
 audit:

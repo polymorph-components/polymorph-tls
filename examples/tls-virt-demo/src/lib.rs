@@ -1,13 +1,14 @@
-//! Demo app for the `tls-virt` virtualizer: plain TCP, no TLS anywhere
-//! in this code.
+//! Demo app for the tls-virt deliveries: plain TCP, no TLS anywhere in
+//! this code.
 //!
 //! The app resolves a hostname, connects, sends one LF-terminated line,
 //! closes its write direction, reads the response until the peer closes,
 //! and checks the response is the line reversed (the shape of `openssl
-//! s_server -rev`). Run against a name under the virtualizer's
-//! `.tls-virt.alt` suffix, all of that happens through a TLS tunnel the
-//! app never sees; the printed remote address is the virtualizer's handle
-//! address, not the real peer.
+//! s_server -rev`). Run under either tls-virt delivery (the composed
+//! `tls-virt-guest` component or the `tls-virt-wasmtime` embedding)
+//! against a name under the `.tls-virt.alt` suffix, all of that happens
+//! through a TLS tunnel the app never sees; the printed remote address
+//! is a minted handle address, not the real peer.
 //!
 //! ```text
 //! tls-virt-demo <hostname> <port> <payload>

@@ -1,6 +1,6 @@
-# `tls-virt`
+# `tls-virt-guest`
 
-An experimental `wasi:sockets@0.3.0` virtualizer that adds TLS
+A `wasi:sockets@0.3.0` virtualizer component that adds TLS
 transparently: an application that speaks plain TCP through
 `wasi:sockets` is composed against this component instead of the host,
 opts a hostname in by suffixing it with `.tls-virt.alt`, and every byte
@@ -9,18 +9,21 @@ by the composed `lann:tls` client. The application contains no TLS code
 and cannot observe the tunnel; everything else — unsuffixed names,
 literal addresses, UDP — passes through to the host unchanged.
 
-This prototype exists to validate the analysis in issue #14: that the
-`lann:tls` transform-pair interface (send/receive wired before the
-handshake) can sit behind a connect-then-send sockets surface, at the
-cost of one pipe and one splice task on the transmit side. It can.
+The guest delivery of the tls-virt scheme: the name opt-in and
+handle-address design live in [`tls-virt-common`](../tls-virt-common),
+and [`tls-virt-wasmtime`](../tls-virt-wasmtime) implements the same
+interposition host-side. Originally built to validate the analysis in
+issue #14: that the `lann:tls` transform-pair interface (send/receive
+wired before the handshake) can sit behind a connect-then-send sockets
+surface, at the cost of one pipe and one splice task on the transmit
+side. It can.
 
 ## Design
 
 - **Opt-in by name.** `resolve-addresses("host.tls-virt.alt")` resolves
-  `host` via the host resolver, stores `(hostname, addresses)` in a
-  table, and returns a **handle address**: a random 64-bit suffix under
-  a random ULA /64 prefix (RFC 4193 `fd00::/8`) minted once per
-  instance. Handle addresses never appear on the wire.
+  `host` via the host resolver, stores the destination in the handle
+  table, and returns a minted handle address (see `tls-virt-common` for
+  the scheme).
 - **Connect to a handle** opens a real connection to a stored address
   (preferring IPv6) and drives the TLS handshake with the stored
   hostname (SNI + certificate verification). Ciphertext streams are
@@ -33,7 +36,7 @@ cost of one pipe and one splice task on the transmit side. It can.
 
 ## Findings
 
-Three composition/bindings facts this prototype established, each load
+Three composition/bindings facts this component established, each load
 bearing for any sockets-shaped virtualizer:
 
 - **Export a renamed structural copy, rewire it in wac.** One component
@@ -60,7 +63,8 @@ bearing for any sockets-shaped virtualizer:
   type" is false across directions. Splitting the world into an
   imports-only and an exports-only world, with one `generate!`
   invocation each, keeps the payload maps separate; both invocations
-  share one runtime, so handles flow freely between them.
+  share one runtime, so handles flow freely between them. Tracked for
+  upstream reporting in issue #15.
 
 - **Only async-lifted exports have a task scope; structure the
   virtualizer around `connect`.** wit-bindgen spawns are polled by the
@@ -79,28 +83,30 @@ bearing for any sockets-shaped virtualizer:
   - `listen` is **not supported**: each accepted host socket would need
     wrapping into an exported resource (resources are nominal, so no
     by-handle pass-through), and that wrapper needs a resident task no
-    export on the listen path can host.
+    export on the listen path can host. The host delivery does not have
+    this limit; see `tls-virt-wasmtime`.
 
-## Prototype limits
+## Limits
 
-Deliberate scope cuts, over and above the findings: trust roots are the
-repository's baked test fixtures (`rust/quinn/tests/testdata/ca.der`),
-ALPN is not offered, socket options set before a tunneled `connect` are
-not migrated to the real socket, `get-address-family` on a tunnel
-reports IPv6 regardless of the real transport, and TLS failures surface
-as `connection-reset`/stream closure with detail on stderr only.
+Trust roots are the repository's baked test fixtures
+(`rust/quinn/tests/testdata/ca.der`), ALPN is not offered, socket
+options set before a tunneled `connect` are not migrated to the real
+socket, `get-address-family` on a tunnel reports IPv6 regardless of the
+real transport, and TLS failures surface as `connection-reset`/stream
+closure with detail on stderr only. See issue #16 for the
+productionization gaps.
 
 ## Running
 
 ```sh
-just smoke-tls-virt
+just smoke-tls-virt-guest
 ```
 
-Builds the `lann:tls` component (plain world), the virtualizer, and the
-demo app; composes them per `compose.wac` (`wac compose`, with the
-import-satisfaction gate); then runs the composed component against
-`openssl s_server -rev` on localhost. The demo dials
-`localhost.tls-virt.alt`, sends one line, and verifies the reversed
-echo and a clean close in both directions; the script additionally
-asserts the resolver returned a handle address and that openssl saw a
-TLS 1.3 handshake.
+Builds the `lann:tls` component (plain world), this virtualizer, and
+the demo app (`examples/tls-virt-demo`); composes them per
+`compose.wac` (`wac compose`, with the import-satisfaction gate); then
+runs the composed component against `openssl s_server -rev` on
+localhost. The demo dials `localhost.tls-virt.alt`, sends one line, and
+verifies the reversed echo and a clean close in both directions; the
+script additionally asserts the resolver returned a handle address and
+that openssl saw a TLS 1.3 handshake.

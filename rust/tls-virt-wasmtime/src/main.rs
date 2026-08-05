@@ -1,8 +1,9 @@
-//! Experimental wasmtime embedding: transparent TLS as a `wasi:sockets`
-//! host provider.
+//! wasmtime embedding: transparent TLS as a `wasi:sockets` host
+//! provider.
 //!
-//! The host-side counterpart of the `tls-virt` component virtualizer:
-//! the same interposition — suffix-opted name resolutions return minted
+//! The host delivery of the tls-virt scheme (`tls-virt-common`), and
+//! the counterpart of the `tls-virt-guest` component virtualizer: the
+//! same interposition — suffix-opted name resolutions return minted
 //! handle addresses, connects to handle addresses open a real TCP
 //! connection and drive a TLS 1.3 handshake (SNI + verification against
 //! baked fixture roots), and the guest's bytes tunnel through TLS it
@@ -21,21 +22,22 @@
 //! profile configs) and never touches a wasmtime-wasi socket.
 //!
 //! ```text
-//! tls-virt-host <component.wasm> [guest args...]
+//! tls-virt-wasmtime <component.wasm> [guest args...]
 //! ```
 //!
 //! Runs the component's `wasi:cli/run@0.3.0` export with stdio
-//! inherited, network inherited, and name lookup allowed. Prototype
-//! limits are recorded in README.md.
+//! inherited, network inherited, and name lookup allowed. Limits are
+//! recorded in README.md.
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::BytesMut;
 use rustls_pki_types::{CertificateDer, ServerName};
+use tls_virt_common::{strip_suffix, Entry, HandleTable};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt as _, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
@@ -57,12 +59,9 @@ use wasmtime_wasi::p3::sockets::{SocketError, SocketResult};
 use wasmtime_wasi::sockets::{WasiSockets, WasiSocketsCtxView};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
-/// Names under this suffix opt in to TLS tunneling.
-const SUFFIX: &str = ".tls-virt.alt";
-
-/// Trust anchor for tunneled connections (prototype: the repository's
-/// test CA).
-const ROOT: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
+/// Trust anchor for tunneled connections (the repository's test CA;
+/// see README.md).
+const ROOT: &[u8] = include_bytes!("../../quinn/tests/testdata/ca.der");
 
 /// Read hop size for the tunnel's receive producer.
 const CHUNK: usize = 16 * 1024;
@@ -90,10 +89,8 @@ impl WasiView for Ctx {
 
 /// The virtualizing provider's own state.
 struct VirtCtx {
-    /// The random ULA /64 this instance mints handles under.
-    prefix: [u8; 8],
-    /// Handle table: random 64-bit suffix → resolved destination.
-    names: HashMap<u64, Entry>,
+    /// The handle-address table (`tls-virt-common`).
+    names: HandleTable,
     /// Tunnels, keyed by the socket resource's table index. A socket
     /// with an entry here is a tunnel; every other socket delegates.
     tunnels: HashMap<u32, Tunnel>,
@@ -103,11 +100,6 @@ struct VirtCtx {
     /// Runtime handle for the close_notify shutdown task (spawned from
     /// a `Drop` impl, which cannot await).
     runtime: tokio::runtime::Handle,
-}
-
-struct Entry {
-    hostname: String,
-    addrs: Vec<IpAddress>,
 }
 
 struct Tunnel {
@@ -123,10 +115,6 @@ struct Tunnel {
 
 impl VirtCtx {
     fn new() -> Result<Self> {
-        let mut prefix = [0u8; 8];
-        getrandom::fill(&mut prefix).context("randomness unavailable")?;
-        prefix[0] = 0xfd;
-
         let mut roots = rustls::RootCertStore::empty();
         roots
             .add(CertificateDer::from(ROOT.to_vec()))
@@ -134,8 +122,7 @@ impl VirtCtx {
         let config = lann_tls::client_config(roots);
 
         Ok(Self {
-            prefix,
-            names: HashMap::new(),
+            names: HandleTable::new(),
             tunnels: HashMap::new(),
             connector: TlsConnector::from(Arc::new(config)),
             runtime: tokio::runtime::Handle::current(),
@@ -143,42 +130,19 @@ impl VirtCtx {
     }
 
     fn mint_handle(&mut self, entry: Entry) -> IpAddress {
-        let mut suffix = [0u8; 8];
-        getrandom::fill(&mut suffix).expect("randomness available");
-        let key = u64::from_be_bytes(suffix);
-        self.names.insert(key, entry);
-        let mut bytes = [0u8; 16];
-        bytes[..8].copy_from_slice(&self.prefix);
-        bytes[8..].copy_from_slice(&suffix);
-        let seg = |i: usize| u16::from_be_bytes([bytes[2 * i], bytes[2 * i + 1]]);
-        IpAddress::Ipv6((
-            seg(0),
-            seg(1),
-            seg(2),
-            seg(3),
-            seg(4),
-            seg(5),
-            seg(6),
-            seg(7),
-        ))
+        let s = self.names.mint(entry).segments();
+        IpAddress::Ipv6((s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]))
     }
 
-    /// The table entry a handle socket-address refers to, if it is one.
-    fn lookup_handle(&self, remote: &IpSocketAddress) -> Option<(String, Vec<IpAddress>, u16)> {
+    /// The destination a handle socket-address refers to, if it is one.
+    fn lookup_handle(&self, remote: &IpSocketAddress) -> Option<(String, Vec<IpAddr>, u16)> {
         let IpSocketAddress::Ipv6(v6) = remote else {
             return None;
         };
         let (a, b, c, d, e, f, g, h) = v6.address;
-        let mut bytes = [0u8; 16];
-        for (i, seg) in [a, b, c, d, e, f, g, h].into_iter().enumerate() {
-            bytes[2 * i..2 * i + 2].copy_from_slice(&seg.to_be_bytes());
-        }
-        if bytes[..8] != self.prefix {
-            return None;
-        }
-        let key = u64::from_be_bytes(bytes[8..].try_into().unwrap());
+        let addr = Ipv6Addr::new(a, b, c, d, e, f, g, h);
         self.names
-            .get(&key)
+            .lookup(&addr)
             .map(|e| (e.hostname.clone(), e.addrs.clone(), v6.port))
     }
 }
@@ -383,7 +347,7 @@ impl HostTcpSocketWithStore<Ctx> for VirtSockets {
         // Tunnel path: real transport plus TLS handshake, all native.
         // The guest's socket resource stays in its unconnected state and
         // serves only as the handle the tunnel is keyed under.
-        let addr = pick_addr(&addrs, port).ok_or(ErrorCode::RemoteUnreachable)?;
+        let addr = tls_virt_common::pick_addr(&addrs, port).ok_or(ErrorCode::RemoteUnreachable)?;
         let connector = accessor.with(|mut a| a.get().virt.connector.clone());
 
         let stream = TcpStream::connect(addr).await.map_err(ErrorCode::from)?;
@@ -391,7 +355,7 @@ impl HostTcpSocketWithStore<Ctx> for VirtSockets {
         let server_name =
             ServerName::try_from(hostname.clone()).map_err(|_| ErrorCode::InvalidArgument)?;
         let tls = connector.connect(server_name, stream).await.map_err(|e| {
-            eprintln!("tls-virt-host: TLS handshake with {hostname:?} failed: {e}");
+            eprintln!("tls-virt-wasmtime: TLS handshake with {hostname:?} failed: {e}");
             ErrorCode::ConnectionReset
         })?;
         let (read, write) = tokio::io::split(tls);
@@ -614,7 +578,7 @@ impl ip_name_lookup::HostWithStore<Ctx> for VirtSockets {
         name: String,
     ) -> wasmtime::Result<Result<Vec<IpAddress>, LookupErrorCode>> {
         let delegated = accessor.with_getter::<WasiSockets>(wasi_sockets_view);
-        match name.strip_suffix(SUFFIX) {
+        match strip_suffix(&name) {
             Some(real) => {
                 // The inner resolution is wasmtime-wasi's, so the
                 // allow-ip-name-lookup policy applies to opted-in names
@@ -635,7 +599,7 @@ impl ip_name_lookup::HostWithStore<Ctx> for VirtSockets {
                 let handle = accessor.with(|mut a| {
                     a.get().virt.mint_handle(Entry {
                         hostname: real.to_string(),
-                        addrs,
+                        addrs: addrs.into_iter().map(ip_to_std).collect(),
                     })
                 });
                 Ok(Ok(vec![handle]))
@@ -650,24 +614,12 @@ impl ip_name_lookup::HostWithStore<Ctx> for VirtSockets {
     }
 }
 
-/// A destination socket-address from a resolved entry, preferring IPv6.
-fn pick_addr(addrs: &[IpAddress], port: u16) -> Option<SocketAddr> {
-    let v6 = addrs.iter().find_map(|a| match a {
-        IpAddress::Ipv6(s) => Some(SocketAddr::from((
-            std::net::Ipv6Addr::new(s.0, s.1, s.2, s.3, s.4, s.5, s.6, s.7),
-            port,
-        ))),
-        _ => None,
-    });
-    v6.or_else(|| {
-        addrs.iter().find_map(|a| match a {
-            IpAddress::Ipv4((a, b, c, d)) => Some(SocketAddr::from((
-                std::net::Ipv4Addr::new(*a, *b, *c, *d),
-                port,
-            ))),
-            _ => None,
-        })
-    })
+/// A resolved address in the handle table's terms.
+fn ip_to_std(addr: IpAddress) -> IpAddr {
+    match addr {
+        IpAddress::Ipv4((a, b, c, d)) => IpAddr::V4(std::net::Ipv4Addr::new(a, b, c, d)),
+        IpAddress::Ipv6(s) => IpAddr::V6(Ipv6Addr::new(s.0, s.1, s.2, s.3, s.4, s.5, s.6, s.7)),
+    }
 }
 
 // --- the tunnel data path ---
@@ -690,7 +642,7 @@ impl TlsSendConsumer {
             (Ok(()), Some(mut write)) => {
                 self.runtime.spawn(async move {
                     let res = write.shutdown().await.map_err(|e| {
-                        eprintln!("tls-virt-host: TLS shutdown failed: {e}");
+                        eprintln!("tls-virt-wasmtime: TLS shutdown failed: {e}");
                         ErrorCode::from(e)
                     });
                     _ = tx.send(res);
@@ -739,7 +691,7 @@ impl<D> StreamConsumer<D> for TlsSendConsumer {
                 Poll::Ready(Ok(StreamResult::Completed))
             }
             Poll::Ready(Err(e)) => {
-                eprintln!("tls-virt-host: send direction failed: {e}");
+                eprintln!("tls-virt-wasmtime: send direction failed: {e}");
                 this.close(Err(ErrorCode::from(e)));
                 Poll::Ready(Ok(StreamResult::Dropped))
             }
@@ -798,7 +750,7 @@ impl<D> StreamProducer<D> for TlsReceiveProducer {
                 }
             }
             Poll::Ready(Err(e)) => {
-                eprintln!("tls-virt-host: receive direction failed: {e}");
+                eprintln!("tls-virt-wasmtime: receive direction failed: {e}");
                 this.close(Err(ErrorCode::ConnectionReset));
                 Poll::Ready(Ok(StreamResult::Dropped))
             }
@@ -816,7 +768,9 @@ async fn main() -> Result<()> {
     let [_, component_path, _guest_args @ ..] = args.as_slice() else {
         bail!(
             "usage: {} <component.wasm> [guest args...]",
-            args.first().map(String::as_str).unwrap_or("tls-virt-host"),
+            args.first()
+                .map(String::as_str)
+                .unwrap_or("tls-virt-wasmtime"),
         );
     };
 

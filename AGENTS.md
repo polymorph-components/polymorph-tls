@@ -32,6 +32,16 @@ design record.
 - `rust/component` — the `lann:tls` component (enforced delivery);
   wasm-only cdylib, `delegated-signer` feature selects the
   `tls-delegated` world.
+- `rust/tls-virt-common` — the tls-virt scheme (suffix-opted names,
+  minted handle addresses, destination selection), shared by both
+  tls-virt deliveries; its lib docs are the scheme record.
+- `rust/tls-virt-guest` — the guest tls-virt delivery: a `wasi:sockets`
+  virtualizer component adding transparent TLS via the composed
+  `lann:tls` client; carries `compose.wac` and the record of the
+  bindings findings in its README.
+- `rust/tls-virt-wasmtime` — the host tls-virt delivery: a wasmtime
+  embedding whose sockets provider wraps wasmtime-wasi's; native crate,
+  excluded from wasm builds (`build-wasm` passes `--exclude`).
 - `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
   guests; `quic-loopback` also carries the QUIC interop endpoint modes.
 - `examples/tls-delegated-loopback`, `examples/test-signer`,
@@ -40,15 +50,10 @@ design record.
   the shim adapting a `lann:webcrypto` provider to `lann:tls/signer`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
-- `experimental/` — prototypes, per its README's contract (no
-  stability, not in the default gates): `tls-virt` is a `wasi:sockets`
-  virtualizer adding transparent TLS via the composed `lann:tls`
-  client, with its own demo, composition, and smoke script;
-  `tls-virt-host` is the same interposition as a wasmtime embedding
-  wrapping wasmtime-wasi's sockets provider (workspace-excluded, own
-  lockfile).
-- `scripts/` — audit helper and the interop harnesses (with their Go
-  peer in `scripts/interop/peer`).
+- `examples/tls-virt-demo` — the plain-TCP demo guest both tls-virt
+  rigs run unmodified.
+- `scripts/` — audit helper, the interop harnesses (with their Go
+  peer in `scripts/interop/peer`), and the tls-virt smoke harnesses.
 
 ## Checks
 
@@ -56,6 +61,7 @@ design record.
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
 | `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `lann:webcrypto` provider |
+| `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider (handle-address and profile-cipher-suite gates, plus a plain-TCP passthrough-delegation leg) |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 

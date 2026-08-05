@@ -1,6 +1,6 @@
 [package]
 name = "tls-virt-demo"
-description = "Demo app for the tls-virt virtualizer: plain TCP through a suffixed hostname, transparently tunneled over TLS"
+description = "Demo app for the tls-virt deliveries: plain TCP through a suffixed hostname, transparently tunneled over TLS"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

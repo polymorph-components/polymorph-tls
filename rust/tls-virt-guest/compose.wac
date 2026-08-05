@@ -13,7 +13,7 @@ let tls = new lann:tls-component { ... };
 
 // The virtualizer: TLS from the `lann:tls` instance; real sockets and
 // name lookup from the host.
-let virt = new lann:tls-virt {
+let virt = new lann:tls-virt-guest {
     "lann:tls/types@0.1.0": tls["lann:tls/types@0.1.0"],
     "lann:tls/client@0.1.0": tls["lann:tls/client@0.1.0"],
     ...

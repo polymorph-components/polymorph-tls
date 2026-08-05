@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Smoke test for the tls-virt-host prototype: the demo component runs
-# under the custom wasmtime embedding, whose wasi:sockets provider
-# tunnels suffix-opted connections through TLS.
+# Smoke rig for the tls-virt-wasmtime delivery: the demo component runs
+# under the wasmtime embedding, whose wasi:sockets provider tunnels
+# suffix-opted connections through TLS.
 #
 # Two legs. The tunnel leg dials a `.tls-virt.alt` name against
 # `openssl s_server -rev`: gates that the resolver returned a handle
@@ -11,7 +11,7 @@
 # unsuffixed name against a plain-TCP reverse echo: gates that
 # delegation to wasmtime-wasi carries an entire connection.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 
 work=$(mktemp -d)
 cleanup() {
@@ -22,13 +22,9 @@ trap cleanup EXIT
 
 log() { printf '\n=== %s\n' "$*"; }
 
-HOST=experimental/tls-virt-host/target/debug/tls-virt-host
+HOST=target/debug/tls-virt-wasmtime
 DEMO=target/wasm32-wasip2/debug/tls_virt_demo.wasm
 TESTDATA=rust/quinn/tests/testdata
-
-log "build"
-cargo build -p tls-virt-demo --target wasm32-wasip2
-(cd experimental/tls-virt-host && cargo build)
 
 log "fixture PKI to PEM"
 openssl x509 -inform der -in "$TESTDATA/leaf.der" -out "$work/leaf.pem"
@@ -40,7 +36,7 @@ openssl s_server -accept "$port" -naccept 1 -rev -tls1_3 \
     -cert "$work/leaf.pem" -key "$work/leaf-key.pem" > "$work/s_server.log" 2>&1 &
 for _ in $(seq 1 100); do grep -q ACCEPT "$work/s_server.log" && break; sleep 0.1; done
 
-timeout 60 "$HOST" "$DEMO" localhost.tls-virt.alt "$port" tls-virt-host-smoke \
+timeout 60 "$HOST" "$DEMO" localhost.tls-virt.alt "$port" tls-virt-wasmtime-smoke \
     | tee "$work/demo.log"
 wait
 
@@ -82,4 +78,4 @@ grep -q 'reversed echo verified' "$work/demo2.log"
 ! grep -q 'resolved localhost -> fd' "$work/demo2.log"
 
 echo
-echo "tls-virt-host smoke OK"
+echo "tls-virt-wasmtime smoke OK"

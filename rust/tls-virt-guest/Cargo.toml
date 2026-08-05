@@ -1,6 +1,6 @@
 [package]
-name = "tls-virt"
-description = "Experimental wasi:sockets virtualizer: transparent TLS tunneling for suffix-opted hostnames via the composed lann:tls client"
+name = "tls-virt-guest"
+description = "wasi:sockets virtualizer component: transparent TLS tunneling for suffix-opted hostnames via the composed lann:tls client"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,6 +10,6 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
+tls-virt-common = { workspace = true }
 wit-bindgen = { workspace = true }
 futures = { workspace = true }
-getrandom = "0.3"

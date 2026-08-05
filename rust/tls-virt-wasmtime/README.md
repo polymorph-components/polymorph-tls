@@ -1,15 +1,17 @@
-# `tls-virt-host`
+# `tls-virt-wasmtime`
 
-The host-side counterpart of [`tls-virt`](../tls-virt/README.md): the
-same transparent-TLS interposition on `wasi:sockets@0.3.0` — suffix-opted
-name resolutions return minted handle addresses, connects to handle
-addresses open the real transport and drive a TLS 1.3 handshake, the
-guest speaks plain TCP and cannot observe the tunnel — implemented as a
-wasmtime embedding whose sockets host provider wraps wasmtime-wasi's,
-instead of as a wasm component composed in front of the guest.
+The host delivery of the tls-virt scheme, and the counterpart of
+[`tls-virt-guest`](../tls-virt-guest): the same transparent-TLS
+interposition on `wasi:sockets@0.3.0` — suffix-opted name resolutions
+return minted handle addresses, connects to handle addresses open the
+real transport and drive a TLS 1.3 handshake, the guest speaks plain
+TCP and cannot observe the tunnel — implemented as a wasmtime embedding
+whose sockets host provider wraps wasmtime-wasi's, instead of as a wasm
+component composed in front of the guest. The name opt-in and
+handle-address design live in [`tls-virt-common`](../tls-virt-common).
 
-The same demo component (`experimental/tls-virt/demo`) runs unmodified
-against both: the two experiments interpose on the same surface from
+The same demo component (`examples/tls-virt-demo`) runs unmodified
+against both deliveries: they interpose on the same surface from
 opposite sides of the host boundary.
 
 The tunnel's TLS runs the `lann-tls` profile configs natively
@@ -41,7 +43,7 @@ offered cipher suites are the profile's, verbatim.
   half; the direction verdicts are oneshot-backed `FutureReader`s —
   the same shapes as wasmtime-wasi's own TCP implementation.
 
-## Findings (contrasts with the component virtualizer)
+## Findings (contrasts with the guest virtualizer)
 
 - **The bindings-level obstacles vanish.** No structural-copy export
   package, no two-worlds bindgen split (the wit-bindgen payload-vtable
@@ -50,17 +52,17 @@ offered cipher suites are the profile's, verbatim.
   implementation's types are the wrapper's types.
 - **`listen` works by delegation.** Accepted sockets land in the
   *shared* resource table as ordinary wasmtime-wasi sockets, so every
-  later operation on them delegates too. The component experiment's
-  blocker — wrapping accepted nominal resources needs a resident task
-  no export can host — does not arise when the wrapper and the wrapped
+  later operation on them delegates too. The guest delivery's blocker —
+  wrapping accepted nominal resources needs a resident task no export
+  can host — does not arise when the wrapper and the wrapped
   implementation share a resource table.
 - **Task scoping is not a concern; `Drop` is the awkward seam.** Host
   producers/consumers are polled by wasmtime directly, so nothing like
-  the component's spawns-only-run-in-async-export-scope constraint
-  exists. The one rough edge: the guest ending its transmit stream
-  surfaces as the consumer's `Drop`, which cannot await — the TLS
-  shutdown (close_notify, then FIN) must be spawned onto the runtime
-  from `drop`, with the verdict resolving after the flush.
+  the guest's spawns-only-run-in-async-export-scope constraint exists.
+  The one rough edge: the guest ending its transmit stream surfaces as
+  the consumer's `Drop`, which cannot await — the TLS shutdown
+  (close_notify, then FIN) must be spawned onto the runtime from
+  `drop`, with the verdict resolving after the flush.
 - **Delegation is trait-deep only.** wasmtime-wasi's trait impls are
   public and callable, but everything beneath them is `pub(crate)`:
   the `TcpSocket` state machine cannot be constructed or driven
@@ -71,7 +73,7 @@ offered cipher suites are the profile's, verbatim.
   `allow-ip-name-lookup` gate. A production wrapper would need its own
   address policy for tunneled connects.
 
-## Prototype limits
+## Limits
 
 Trust roots are the repository's baked test fixtures
 (`rust/quinn/tests/testdata/ca.der`), ALPN is not offered, socket
@@ -80,16 +82,13 @@ than the tunnel's transport (as does `get-address-family`), the 0.2.x
 sockets registered by `p2::add_to_linker_async` are not wrapped (a
 guest importing them would bypass the tunnel; the demo imports only
 0.3.0 sockets), and TLS failures surface as `connection-reset`/stream
-closure with detail on stderr only.
-
-This crate is excluded from the workspace: it is a native embedding and
-cannot build for the workspace's wasm32-wasip2 target. It has its own
-lockfile and builds on demand.
+closure with detail on stderr only. See issue #16 for the
+productionization gaps.
 
 ## Running
 
 ```sh
-just smoke-tls-virt-host
+just smoke-tls-virt-wasmtime
 ```
 
 Builds the demo component and this embedding, then runs two legs: the

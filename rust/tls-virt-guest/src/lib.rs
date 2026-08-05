@@ -1,15 +1,14 @@
-//! Experimental `wasi:sockets` virtualizer: transparent TLS tunneling.
+//! `wasi:sockets` virtualizer component: transparent TLS tunneling.
 //!
+//! The guest delivery of the tls-virt scheme (`tls-virt-common`).
 //! Exports a structural copy of `wasi:sockets/types` and
 //! `wasi:sockets/ip-name-lookup` (under the `virt:sockets` package name;
 //! see world.wit), backed by the host's implementations of the same
 //! interfaces plus the composed `lann:tls` client:
 //!
 //! - Resolving a name under the `.tls-virt.alt` suffix resolves the real
-//!   name via the host, stores `(hostname, addresses)` in a table, and
-//!   returns a **handle address**: a random 64-bit suffix under a random
-//!   ULA /64 prefix (RFC 4193 `fd00::/8`) chosen at startup. Handle
-//!   addresses never appear on the wire.
+//!   name via the host, stores the destination in a handle table, and
+//!   returns a minted handle address.
 //! - Connecting to a handle address opens a real connection to a stored
 //!   address and drives a TLS handshake with the stored hostname (SNI +
 //!   verification); the application's bytes are then tunneled through
@@ -20,16 +19,17 @@
 //!   prefix, UDP — passes through to the host unchanged, with transport
 //!   verdict futures reissued by handle rather than by task.
 //!
-//! Prototype limits (see README.md): trust roots are baked test
-//! fixtures, ALPN is not offered, socket options set before a tunneled
-//! connect are not migrated to the real socket, `listen` is not
-//! supported, and TLS failures are reported as `connection-reset`/stream
-//! closure with detail on stderr.
+//! Limits (see README.md): trust roots are baked test fixtures, ALPN is
+//! not offered, socket options set before a tunneled connect are not
+//! migrated to the real socket, `listen` is not supported, and TLS
+//! failures are reported as `connection-reset`/stream closure with
+//! detail on stderr.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
 use futures::channel::oneshot;
+use tls_virt_common::{strip_suffix, Entry, HandleTable};
 use wit_bindgen::{FutureReader, StreamReader, StreamResult, StreamWriter};
 
 /// The host-facing bindings (imports only). Generated separately from the
@@ -69,74 +69,34 @@ use virt_bindings::exports::virt::sockets::types::{
     TcpSocket as VTcpSocketResource, UdpSocket as VUdpSocketResource,
 };
 
-/// Names under this suffix opt in to TLS tunneling.
-const SUFFIX: &str = ".tls-virt.alt";
-
-/// Trust anchors for tunneled connections (prototype: the repository's
-/// test CA).
-const ROOTS: &[&[u8]] = &[include_bytes!(
-    "../../../../rust/quinn/tests/testdata/ca.der"
-)];
+/// Trust anchors for tunneled connections (the repository's test CA;
+/// see README.md).
+const ROOTS: &[&[u8]] = &[include_bytes!("../../quinn/tests/testdata/ca.der")];
 
 /// Stream-read hop size for the transmit splice.
 const CHUNK: usize = 16 * 1024;
 
-struct Entry {
-    hostname: String,
-    addrs: Vec<host::IpAddress>,
-}
-
 thread_local! {
-    /// Handle table: random 64-bit suffix → resolved destination.
-    static TABLE: RefCell<HashMap<u64, Entry>> = RefCell::new(HashMap::new());
-    /// The random ULA /64 this instance mints handles under.
-    static PREFIX: [u8; 8] = {
-        let mut prefix = [0u8; 8];
-        getrandom::fill(&mut prefix).expect("randomness available");
-        prefix[0] = 0xfd;
-        prefix
-    };
+    /// The handle-address table (`tls-virt-common`).
+    static TABLE: RefCell<HandleTable> = RefCell::new(HandleTable::new());
 }
 
 fn mint_handle(entry: Entry) -> VIpAddress {
-    let mut suffix = [0u8; 8];
-    getrandom::fill(&mut suffix).expect("randomness available");
-    let key = u64::from_be_bytes(suffix);
-    TABLE.with(|t| t.borrow_mut().insert(key, entry));
-    let mut bytes = [0u8; 16];
-    PREFIX.with(|p| bytes[..8].copy_from_slice(p));
-    bytes[8..].copy_from_slice(&suffix);
-    let seg = |i: usize| u16::from_be_bytes([bytes[2 * i], bytes[2 * i + 1]]);
-    VIpAddress::Ipv6((
-        seg(0),
-        seg(1),
-        seg(2),
-        seg(3),
-        seg(4),
-        seg(5),
-        seg(6),
-        seg(7),
-    ))
+    let handle = TABLE.with(|t| t.borrow_mut().mint(entry));
+    let s = handle.segments();
+    VIpAddress::Ipv6((s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]))
 }
 
-/// The table entry a handle socket-address refers to, if it is one.
-fn lookup_handle(remote: &VIpSocketAddress) -> Option<(String, Vec<host::IpAddress>, u16)> {
+/// The destination a handle socket-address refers to, if it is one.
+fn lookup_handle(remote: &VIpSocketAddress) -> Option<(String, Vec<IpAddr>, u16)> {
     let VIpSocketAddress::Ipv6(v6) = remote else {
         return None;
     };
     let (a, b, c, d, e, f, g, h) = v6.address;
-    let mut bytes = [0u8; 16];
-    for (i, seg) in [a, b, c, d, e, f, g, h].into_iter().enumerate() {
-        bytes[2 * i..2 * i + 2].copy_from_slice(&seg.to_be_bytes());
-    }
-    let is_ours = PREFIX.with(|p| &bytes[..8] == p);
-    if !is_ours {
-        return None;
-    }
-    let key = u64::from_be_bytes(bytes[8..].try_into().unwrap());
+    let addr = Ipv6Addr::new(a, b, c, d, e, f, g, h);
     TABLE.with(|t| {
         t.borrow()
-            .get(&key)
+            .lookup(&addr)
             .map(|e| (e.hostname.clone(), e.addrs.clone(), v6.port))
     })
 }
@@ -152,7 +112,7 @@ impl TypesGuest for Component {
 
 impl LookupGuest for Component {
     async fn resolve_addresses(name: String) -> Result<Vec<VIpAddress>, VLookupErrorCode> {
-        match name.strip_suffix(SUFFIX) {
+        match strip_suffix(&name) {
             Some(real) => {
                 let real = real.to_string();
                 let addrs = host_lookup::resolve_addresses(real.clone())
@@ -163,7 +123,7 @@ impl LookupGuest for Component {
                 }
                 Ok(vec![mint_handle(Entry {
                     hostname: real,
-                    addrs,
+                    addrs: addrs.into_iter().map(addr_to_std).collect(),
                 })])
             }
             None => Ok(host_lookup::resolve_addresses(name)
@@ -261,13 +221,16 @@ impl GuestTcpSocket for VTcp {
         };
 
         // Tunnel path: connect the real transport.
-        let real_addr = pick_addr(&addrs, port).ok_or(VErrorCode::RemoteUnreachable)?;
+        let real_addr =
+            tls_virt_common::pick_addr(&addrs, port).ok_or(VErrorCode::RemoteUnreachable)?;
         let real = host::TcpSocket::create(match &real_addr {
-            host::IpSocketAddress::Ipv4(_) => host::IpAddressFamily::Ipv4,
-            host::IpSocketAddress::Ipv6(_) => host::IpAddressFamily::Ipv6,
+            SocketAddr::V4(_) => host::IpAddressFamily::Ipv4,
+            SocketAddr::V6(_) => host::IpAddressFamily::Ipv6,
         })
         .map_err(err_to_v)?;
-        real.connect(real_addr).await.map_err(err_to_v)?;
+        real.connect(sockaddr_from_std(real_addr))
+            .await
+            .map_err(err_to_v)?;
 
         // Wire the TLS transforms: ciphertext straight onto the socket,
         // application transmit through a pipe (its stream arrives later,
@@ -654,28 +617,36 @@ fn sockaddr_to_v(addr: host::IpSocketAddress) -> VIpSocketAddress {
     }
 }
 
-/// A destination socket-address from a resolved entry, preferring IPv6.
-fn pick_addr(addrs: &[host::IpAddress], port: u16) -> Option<host::IpSocketAddress> {
-    let v6 = addrs.iter().find_map(|a| match a {
-        host::IpAddress::Ipv6(seg) => Some(host::IpSocketAddress::Ipv6(host::Ipv6SocketAddress {
-            port,
+/// A resolved host-side address in the handle table's terms.
+fn addr_to_std(addr: host::IpAddress) -> IpAddr {
+    match addr {
+        host::IpAddress::Ipv4((a, b, c, d)) => IpAddr::V4(std::net::Ipv4Addr::new(a, b, c, d)),
+        host::IpAddress::Ipv6(s) => {
+            IpAddr::V6(Ipv6Addr::new(s.0, s.1, s.2, s.3, s.4, s.5, s.6, s.7))
+        }
+    }
+}
+
+/// A picked destination in the host interface's terms.
+fn sockaddr_from_std(addr: SocketAddr) -> host::IpSocketAddress {
+    match addr {
+        SocketAddr::V4(v4) => host::IpSocketAddress::Ipv4(host::Ipv4SocketAddress {
+            port: v4.port(),
+            address: {
+                let [a, b, c, d] = v4.ip().octets();
+                (a, b, c, d)
+            },
+        }),
+        SocketAddr::V6(v6) => host::IpSocketAddress::Ipv6(host::Ipv6SocketAddress {
+            port: v6.port(),
             flow_info: 0,
-            address: *seg,
+            address: {
+                let s = v6.ip().segments();
+                (s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7])
+            },
             scope_id: 0,
-        })),
-        _ => None,
-    });
-    v6.or_else(|| {
-        addrs.iter().find_map(|a| match a {
-            host::IpAddress::Ipv4(oct) => {
-                Some(host::IpSocketAddress::Ipv4(host::Ipv4SocketAddress {
-                    port,
-                    address: *oct,
-                }))
-            }
-            _ => None,
-        })
-    })
+        }),
+    }
 }
 
 fn err_to_v(code: host::ErrorCode) -> VErrorCode {

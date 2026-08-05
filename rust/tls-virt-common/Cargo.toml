@@ -1,0 +1,10 @@
+[package]
+name = "tls-virt-common"
+description = "The tls-virt scheme: suffix-opted hostnames, minted handle addresses, and destination selection, shared by both deliveries"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+getrandom = "0.3"
