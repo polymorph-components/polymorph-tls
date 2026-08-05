@@ -115,5 +115,6 @@ discipline defeats LLVM, and the runtime's JIT is a second optimizer free
 to reintroduce what the source fought off
 ([CT-Wasm, POPL 2019](https://arxiv.org/abs/1808.01348)). This audit
 establishes that the *bytecode* is the constant-time variant; the runtime
-leg is empirical, per-runtime, and belongs to the timing-verification
-work.
+leg is empirical and per-runtime — the repository's
+[`timing-lab/`](../../timing-lab/README.md) measures it, per wasmtime
+version and per machine.

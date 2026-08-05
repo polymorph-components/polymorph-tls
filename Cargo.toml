@@ -8,6 +8,7 @@ members = [
     "rust/tls-virt-common",
     "rust/tls-virt-guest",
     "rust/tls-virt-wasmtime",
+    "timing-lab",
     "examples/quic-loopback",
     "examples/tls-loopback",
     "examples/tls-delegated-loopback",
