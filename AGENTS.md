@@ -57,6 +57,9 @@ design record.
 - `bench/` — the performance battery (tls-bench, tls-component-bench,
   quic-native-bench) and its captured, provenance-stamped reports in
   `bench/results/`; its README records methodology and caveats.
+- `timing-lab/` — the dudect-style statistical timing lab for the
+  deliveries' protocol-level secret-bearing surfaces; its README carries
+  the methodology, the detection limits, and the hardware-floor record.
 - `scripts/` — audit helper, the interop harnesses (with their Go
   peer in `scripts/interop/peer`), the tls-virt smoke harnesses, and
   the bench runner.
@@ -71,6 +74,7 @@ design record.
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 | `just bench` | non-gating: the performance battery (packet protection, handshakes, record-path and QUIC bulk; native vs wasm vs composed component) with provenance-stamped output |
+| `just timing-lab` | the dudect-style statistical timing lab under wasmtime. Non-gating and deliberately outside `just check` (statistical; environment-sensitive; verdicts are per-runtime-version and per-microarchitecture) — a weekly scheduled workflow runs it, and timing-lab/README.md's detection limits govern how to read a verdict |
 
 Two invariants are already fixed:
 
@@ -214,7 +218,7 @@ so closed numbers remain stable references.
 ## Direction
 
 The bootstrap issue set was the roadmap; the algorithm profile, WIT
-package, component, guest library, quinn compatibility layer, and
-`wasi:sockets` adapter have landed. See the open issues for what remains
-(timing verification, performance measurement, the delegated-signer
-bridge, interop, upstreaming).
+package, component, guest library, quinn compatibility layer,
+`wasi:sockets` adapter, delegated-signer bridge, interop harnesses,
+performance battery, and timing lab have landed. See the open issues for
+what remains (upstreaming, the tls-virt follow-ons).

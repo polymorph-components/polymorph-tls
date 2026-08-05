@@ -8,10 +8,12 @@ following the same architecture.
 
 **Status: spike implementation.** The WIT package, the profile and its
 two deliveries, the quinn compatibility layer, and the `wasi:sockets`
-adapter exist; they pass composed smoke tests under Wasmtime and
+adapter exist; they pass composed smoke tests under Wasmtime,
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
-quic-go over real transports. Timing verification, performance
-measurement, and the delegated-signer bridge remain — see the
+quic-go over real transports, and a scheduled dudect-style
+[timing lab](timing-lab/README.md), with the performance tradeoff
+measured in [`bench/`](bench/README.md). Upstreaming and the tls-virt
+follow-ons remain — see the
 [issue tracker](https://github.com/lann/component-tls/issues).
 
 ## Why pure-wasm TLS 1.3 is plausible

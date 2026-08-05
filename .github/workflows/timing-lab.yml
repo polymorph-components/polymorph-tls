@@ -1,0 +1,62 @@
+name: Timing lab
+
+# The scheduled dudect-style timing lab (timing-lab/README.md): statistical
+# timing tests of the deliveries' protocol-level secret-bearing surfaces,
+# in-guest under wasmtime.
+#
+# Deliberately schedule-only and non-gating: the lab is a statistical
+# experiment on a shared runner, so it cannot gate pull requests without
+# flaking them, and its verdicts are only valid per runtime version and per
+# microarchitecture anyway. It runs on its own cadence instead, and a
+# scheduled run that fails notifies rather than blocking.
+# `continue-on-error` would be the wrong shape here — a job nobody is told
+# about is a job that rots, which is the state this replaces.
+on:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "Samples per class per surface (higher = more sensitive, slower)"
+        required: false
+        default: "2000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: timing-lab
+  cancel-in-progress: false
+
+jobs:
+  timing-lab:
+    # Scheduled workflows run in forks too, where this measures nothing
+    # anyone reads.
+    if: github.repository == 'lann/component-tls'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        # The toolchain version, wasm target, and components are pinned in
+        # rust-toolchain.toml; `rustup show` installs exactly those.
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: timing-lab
+          cache-all-crates: true
+
+      - name: Install just and wasmtime
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,wasmtime
+
+      - name: Run the timing lab
+        run: just timing-lab-scheduled
+        env:
+          TIMING_LAB_SAMPLES: ${{ inputs.samples || '2000' }}

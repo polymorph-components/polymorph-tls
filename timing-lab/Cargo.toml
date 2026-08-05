@@ -1,0 +1,28 @@
+[package]
+name = "timing-lab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "dudect-style timing lab: statistical leakage tests of the TLS/QUIC deliveries' protocol-level secret-bearing surfaces, run in-guest under wasmtime."
+
+[dependencies]
+lann-tls = { workspace = true }
+lann-tls-profile = { workspace = true }
+lann-tls-quinn = { workspace = true }
+quinn-proto = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+ed25519-dalek = { workspace = true }
+# The in-guest constant-time control surface.
+subtle = "2"
+# The key-exchange scalar surfaces reach below the rustls seam (which draws
+# scalars internally); feature sets match what rustls-rustcrypto already
+# enables, so the lab's build compiles the same kernels the deliveries use.
+x25519-dalek = { version = "3", default-features = false }
+p256 = { version = "0.14", default-features = false, features = ["ecdh"] }
+# Isolation surfaces (TIMING_LAB_ISOLATE=1): the AES-GCM seal kernels
+# individually, at the versions the lockfile already pins transitively.
+aes = "0.9.2"
+ctr = "0.10.1"
+ghash = "0.6.0"

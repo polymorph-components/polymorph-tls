@@ -2215,6 +2215,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "timing-lab"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "ctr",
+ "ed25519-dalek",
+ "ghash",
+ "lann-tls",
+ "lann-tls-profile",
+ "lann-tls-quinn",
+ "p256",
+ "quinn-proto",
+ "rustls",
+ "rustls-pki-types",
+ "subtle",
+ "x25519-dalek",
+]
+
+[[package]]
 name = "tinystr"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
