@@ -1,4 +1,7 @@
 //! A bound `wasi:sockets` UDP socket with batched datagram streams.
+//!
+//! `wasi:sockets` offers no GSO/GRO or `sendmmsg` beyond the list-based
+//! batching, and none is assumed.
 
 use std::fmt;
 use std::net::SocketAddr;

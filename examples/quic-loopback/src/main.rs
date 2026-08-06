@@ -20,6 +20,18 @@
 //!
 //! Exit status is the verdict; run under a WASI runtime with network
 //! access (e.g. `wasmtime run -S inherit-network`).
+//!
+//! The `driver`/`socket`/`addr` modules are the rig's own I/O
+//! scaffolding: driving quinn-proto over `wasi:sockets` is validation
+//! machinery here, not a repository deliverable (the QUIC deliverable
+//! is `polymorph-tls-quinn`).
+
+#[cfg(all(target_family = "wasm", target_os = "wasi"))]
+mod addr;
+#[cfg(all(target_family = "wasm", target_os = "wasi"))]
+mod driver;
+#[cfg(all(target_family = "wasm", target_os = "wasi"))]
+mod socket;
 
 #[cfg(all(target_family = "wasm", target_os = "wasi"))]
 fn main() {
@@ -38,7 +50,8 @@ mod run {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    use polymorph_quinn_wasi::{Driver, UdpSocket};
+    use crate::driver::Driver;
+    use crate::socket::UdpSocket;
     use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
     use quinn_proto::{
         ClientConfig, ConnectionError, ConnectionHandle, Dir, Endpoint, EndpointConfig, Event,

@@ -4,8 +4,8 @@ Guidance for automated agents (and humans) working in this repository.
 
 ## What this repository is
 
-`polymorph:tls`: a TLS 1.3 WIT package plus a pure-wasm implementation, designed
-to serve QUIC over `wasi:sockets`. A sibling of
+`polymorph:tls`: a TLS 1.3 WIT package plus a pure-wasm implementation, with
+a quinn-proto compatibility layer serving QUIC embedders. A sibling of
 [`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
 [`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 deliberately mirroring their architecture — prefer clarity and correctness
@@ -26,9 +26,8 @@ design record.
 - `rust/tls` — the curated core delivery: profile provider + TLS 1.3
   configs. Deliberately QUIC-free. Its README records the provider audit.
 - `rust/quinn` — quinn compatibility: RFC 9001 packet protection,
-  quinn-proto session glue, endpoint keys.
-- `rust/quinn-wasi` — quinn-proto driver over `wasi:sockets` UDP; no TLS
-  or profile dependency.
+  quinn-proto session glue, endpoint keys. The QUIC deliverable; the
+  embedder brings the transport.
 - `rust/component` — the `polymorph:tls` component (enforced delivery);
   wasm-only cdylib, `delegated-signer` feature selects the
   `tls-delegated` world.
@@ -43,7 +42,9 @@ design record.
   embedding whose sockets provider wraps wasmtime-wasi's; native crate,
   excluded from wasm builds (`build-wasm` passes `--exclude`).
 - `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
-  guests; `quic-loopback` also carries the QUIC interop endpoint modes.
+  guests; `quic-loopback` also carries the QUIC interop endpoint modes
+  and its own quinn-proto-over-`wasi:sockets` driver (validation
+  machinery, not a delivery).
 - `examples/tls-delegated-loopback`, `examples/test-signer`,
   `examples/webcrypto-signer` — the delegated-signer rig: the
   `tls-delegated` smoke guest, the self-contained fixture signer, and
@@ -219,6 +220,6 @@ so closed numbers remain stable references.
 
 The bootstrap issue set was the roadmap; the algorithm profile, WIT
 package, component, guest library, quinn compatibility layer,
-`wasi:sockets` adapter, delegated-signer bridge, interop harnesses,
-performance battery, and timing lab have landed. See the open issues for
-what remains (upstreaming, the tls-virt follow-ons).
+delegated-signer bridge, interop harnesses, performance battery, and
+timing lab have landed. See the open issues for what remains
+(upstreaming, the tls-virt follow-ons).

@@ -1,4 +1,10 @@
 //! Pumps a `quinn_proto::Endpoint` and its connections over one socket.
+//!
+//! quinn-proto is sans-IO: it consumes received datagrams and emits
+//! datagrams-to-send plus timer deadlines. The driver is the I/O half:
+//! batched receive and transmit on the socket, due timers fired in
+//! [`Driver::pump`], and pollables plus [`Driver::next_deadline`] for
+//! the caller's poll set.
 
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
@@ -9,8 +15,7 @@ use quinn_proto::{
     ClientConfig, ConnectError, Connection, ConnectionEvent, ConnectionHandle, DatagramEvent,
     Endpoint, Event,
 };
-use wasi::clocks::monotonic_clock;
-use wasi::io::poll::{self, Pollable};
+use wasi::io::poll::Pollable;
 
 use crate::socket::{SocketError, UdpSocket};
 
@@ -21,11 +26,10 @@ const RECEIVE_BATCH: u64 = 64;
 ///
 /// The driver is synchronous and single-threaded, in keeping with the
 /// component model's execution model: [`pump`](Self::pump) makes all
-/// progress that is possible without blocking, and
-/// [`wait`](Self::wait) blocks on the socket and timer pollables until
-/// more progress is possible. Applications alternate the two (or use
-/// [`run_until`](Self::run_until)) and drain [`poll_event`](Self::poll_event)
-/// for connection events.
+/// progress that is possible without blocking; between pumps the caller
+/// blocks on a poll set built from the socket pollables and
+/// [`next_deadline`](Self::next_deadline), then drains
+/// [`poll_event`](Self::poll_event) for connection events.
 pub struct Driver {
     socket: UdpSocket,
     endpoint: Endpoint,
@@ -223,35 +227,5 @@ impl Driver {
             .values_mut()
             .filter_map(|c| c.poll_timeout())
             .min()
-    }
-
-    /// Blocks until the socket is readable, the send queue can drain, or
-    /// the earliest connection timer is due.
-    pub fn wait(&mut self) {
-        let mut pollables: Vec<Pollable> = vec![self.incoming_pollable()];
-        if self.has_outbound() {
-            pollables.push(self.outgoing_pollable());
-        }
-        let now = Instant::now();
-        if let Some(deadline) = self.next_deadline() {
-            let wait = deadline.saturating_duration_since(now);
-            pollables.push(monotonic_clock::subscribe_duration(wait.as_nanos() as u64));
-        }
-        let refs: Vec<&Pollable> = pollables.iter().collect();
-        poll::poll(&refs);
-    }
-
-    /// Pumps and waits until `predicate` returns `true`.
-    pub fn run_until<T>(
-        &mut self,
-        mut predicate: impl FnMut(&mut Self) -> Option<T>,
-    ) -> Result<T, SocketError> {
-        loop {
-            while self.pump()? {}
-            if let Some(value) = predicate(self) {
-                return Ok(value);
-            }
-            self.wait();
-        }
     }
 }

@@ -3,7 +3,6 @@ members = [
     "rust/profile",
     "rust/tls",
     "rust/quinn",
-    "rust/quinn-wasi",
     "rust/component",
     "rust/tls-virt-common",
     "rust/tls-virt-guest",
@@ -43,7 +42,6 @@ ed25519-dalek = { version = "3", default-features = false, features = ["alloc", 
 polymorph-tls = { path = "rust/tls" }
 polymorph-tls-quinn = { path = "rust/quinn" }
 tls-virt-common = { path = "rust/tls-virt-common" }
-polymorph-quinn-wasi = { path = "rust/quinn-wasi" }
 
 wasi = "0.14"
 wit-bindgen = { version = "0.60", features = ["async-spawn"] }
