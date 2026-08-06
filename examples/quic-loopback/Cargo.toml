@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 polymorph-tls-quic = { workspace = true }
 polymorph-tls-profile = { workspace = true }
-quinn-proto = { workspace = true }
+noq-proto = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 

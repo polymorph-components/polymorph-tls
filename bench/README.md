@@ -33,7 +33,7 @@ just bench > bench/results/<date>-<host>.md
   negotiates (profile preference order: ChaCha20-Poly1305); the
   enforced delivery has no suite configuration by design.
 - **`quic-native-bench`** and `quic-loopback bench <mib>` — end-to-end
-  QUIC bulk throughput (`quic-bulk`): the same quinn-proto endpoints,
+  QUIC bulk throughput (`quic-bulk`): the same noq-proto endpoints,
   profile TLS, one-process loopback topology and transfer loop, over
   `std::net` UDP natively and `wasi:sockets` UDP under Wasmtime.
 

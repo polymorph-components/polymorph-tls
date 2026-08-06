@@ -1,13 +1,13 @@
 # `polymorph:tls`
 
-A TLS 1.3 WIT package and pure-wasm implementation, with a quinn-proto
+A TLS 1.3 WIT package and pure-wasm implementation, with a noq-proto
 compatibility layer serving QUIC embedders. A sibling of
 [`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
 [`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 following the same architecture.
 
 **Status: spike implementation.** The WIT package, the profile and its
-two deliveries, and the quinn compatibility layer exist; they pass
+two deliveries, and the QUIC compatibility layer exist; they pass
 composed smoke tests under Wasmtime,
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
 quic-go over real transports, and a scheduled dudect-style
@@ -61,9 +61,9 @@ it has two deliveries.
 
 A second ruling orders the goals: **the primary goal is a generally-useful
 TLS interface and implementation.** QUIC support is a real but secondary
-requirement, served at quinn-proto's crypto seam: a separate compatibility
+requirement, served at noq-proto's crypto seam: a separate compatibility
 layer, never part of the core library, for embedders that bring their own
-transport — component-iroh, the motivating consumer, drives quinn-proto
+transport — component-iroh, the motivating consumer, drives noq-proto
 over its own wires. QUIC over `wasi:sockets` à la carte is not a
 deliverable: the in-repo driver exists to validate the stack under a WASI
 runtime (smoke, interop, bench, audit) and lives inside the rig that runs
@@ -92,7 +92,7 @@ it.
   ever a caller-supplied trait object.
 
 The implementation path is assembly, not invention: rustls with a pure-
-RustCrypto `CryptoProvider` at the core; for the QUIC leg, `quinn-proto`
+RustCrypto `CryptoProvider` at the core; for the QUIC leg, `noq-proto`
 (sans-IO QUIC) with the profile implementing its crypto traits, the
 embedder driving the I/O.
 

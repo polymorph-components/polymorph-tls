@@ -96,7 +96,7 @@ interop: interop-tls interop-quic
 interop-tls: build-wasm
     scripts/interop-tls.sh
 
-# The quinn leg against quic-go over wasi:sockets UDP.
+# The noq leg against quic-go over wasi:sockets UDP.
 interop-quic: build-wasm
     scripts/interop-quic.sh
 

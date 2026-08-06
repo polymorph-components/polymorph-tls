@@ -1,4 +1,4 @@
-//! End-to-end validation: a quinn-proto handshake and stream exchange over
+//! End-to-end validation: a noq-proto handshake and stream exchange over
 //! the profile's TLS stack, pumped in memory (no sockets).
 //!
 //! This exercises the whole assembly at once: initial keys, header and
@@ -12,11 +12,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
-use polymorph_tls_profile::{Ed25519Identity, RpkIdentity, ServerIdentity};
-use quinn_proto::{
+use noq_proto::{
     ClientConfig, Connection, ConnectionHandle, DatagramEvent, Dir, Endpoint, EndpointConfig,
-    Event, ServerConfig,
+    Event, FourTuple, ServerConfig,
 };
+use polymorph_tls_profile::{Ed25519Identity, RpkIdentity, ServerIdentity};
 use rustls_pki_types::CertificateDer;
 
 const CA_DER: &[u8] = include_bytes!("testdata/ca.der");
@@ -54,8 +54,8 @@ impl Pump {
             Arc::new(polymorph_tls_quic::TokenKey::new(b"test token master")),
         );
 
-        let client = Endpoint::new(endpoint_config.clone(), None, true, None);
-        let server = Endpoint::new(endpoint_config, Some(Arc::new(server_config)), true, None);
+        let client = Endpoint::new(endpoint_config.clone(), None, true);
+        let server = Endpoint::new(endpoint_config, Some(Arc::new(server_config)), true);
 
         Self {
             client,
@@ -116,7 +116,7 @@ impl Pump {
         if let Some((_, conn)) = from_conn.as_mut() {
             loop {
                 buf.clear();
-                match conn.poll_transmit(now, 1, &mut buf) {
+                match conn.poll_transmit(now, std::num::NonZeroUsize::MIN, &mut buf) {
                     Some(_) => outbound.push(BytesMut::from(&buf[..])),
                     None => break,
                 }
@@ -127,7 +127,13 @@ impl Pump {
         for datagram in outbound {
             moved = true;
             buf.clear();
-            match to.handle(now, from_addr, None, None, datagram, &mut buf) {
+            match to.handle(
+                now,
+                FourTuple::new(from_addr, None),
+                None,
+                datagram,
+                &mut buf,
+            ) {
                 Some(DatagramEvent::NewConnection(incoming)) => {
                     buf.clear();
                     let (ch, conn) = to

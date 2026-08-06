@@ -1,4 +1,4 @@
-//! Native mirror of `quic-loopback bench`: the same quinn-proto
+//! Native mirror of `quic-loopback bench`: the same noq-proto
 //! endpoints, the same profile TLS, the same one-process loopback
 //! topology and transfer loop — over `std::net` UDP instead of
 //! `wasi:sockets`. The delta between this binary's row and the wasm
@@ -21,11 +21,11 @@ use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
-use quinn_proto::{
+use noq_proto::{
     ClientConfig, ConnectionEvent, ConnectionHandle, DatagramEvent, Dir, Endpoint, EndpointConfig,
-    Event, ServerConfig, StreamId, TransportConfig, VarInt,
+    Event, FourTuple, ServerConfig, StreamId, TransportConfig, VarInt,
 };
+use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
 use rustls_pki_types::CertificateDer;
 
 const CA_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/ca.der");
@@ -61,7 +61,7 @@ fn die(message: String) -> ! {
 /// logic mirrored step for step.
 struct Driver {
     endpoint: Endpoint,
-    connections: HashMap<ConnectionHandle, quinn_proto::Connection>,
+    connections: HashMap<ConnectionHandle, noq_proto::Connection>,
     socket: UdpSocket,
     outbound: VecDeque<(Vec<u8>, SocketAddr)>,
     events: VecDeque<(ConnectionHandle, Event)>,
@@ -97,7 +97,7 @@ impl Driver {
         handle
     }
 
-    fn connection_mut(&mut self, handle: ConnectionHandle) -> &mut quinn_proto::Connection {
+    fn connection_mut(&mut self, handle: ConnectionHandle) -> &mut noq_proto::Connection {
         self.connections.get_mut(&handle).expect("connection")
     }
 
@@ -124,8 +124,7 @@ impl Driver {
                     buf.clear();
                     match self.endpoint.handle(
                         now,
-                        remote,
-                        None,
+                        FourTuple::new(remote, None),
                         None,
                         bytes::BytesMut::from(&datagram[..len]),
                         &mut buf,
@@ -174,7 +173,7 @@ impl Driver {
             }
             loop {
                 buf.clear();
-                match connection.poll_transmit(now, 1, &mut buf) {
+                match connection.poll_transmit(now, std::num::NonZeroUsize::MIN, &mut buf) {
                     Some(transmit) => {
                         moved = true;
                         self.outbound
@@ -238,7 +237,7 @@ fn drive<T>(
     }
 }
 
-fn drain_stream(conn: &mut quinn_proto::Connection, id: StreamId) -> (usize, bool) {
+fn drain_stream(conn: &mut noq_proto::Connection, id: StreamId) -> (usize, bool) {
     let mut recv = conn.recv_stream(id);
     let mut n = 0;
     let mut fin = false;
@@ -282,12 +281,7 @@ fn bench(mib: usize) {
     );
     server_config.transport = transport.clone();
     let mut server = Driver::new(
-        Endpoint::new(
-            endpoint_config.clone(),
-            Some(Arc::new(server_config)),
-            true,
-            None,
-        ),
+        Endpoint::new(endpoint_config.clone(), Some(Arc::new(server_config)), true),
         UdpSocket::bind(local).expect("bind server socket"),
     );
 
@@ -302,7 +296,7 @@ fn bench(mib: usize) {
     let mut client_config = ClientConfig::new(Arc::new(quic_client));
     client_config.transport_config(transport);
     let mut client = Driver::new(
-        Endpoint::new(endpoint_config, None, true, None),
+        Endpoint::new(endpoint_config, None, true),
         UdpSocket::bind(local).expect("bind client socket"),
     );
 
@@ -358,7 +352,7 @@ fn bench(mib: usize) {
                     match stream.write(&chunk[..want]) {
                         Ok(0) => break,
                         Ok(n) => written += n,
-                        Err(quinn_proto::WriteError::Blocked) => break,
+                        Err(noq_proto::WriteError::Blocked) => break,
                         Err(e) => die(format!("stream write: {e}")),
                     }
                 }

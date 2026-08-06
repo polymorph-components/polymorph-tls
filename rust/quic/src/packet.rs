@@ -1,5 +1,6 @@
 //! RFC 9001 packet protection and header protection over RustCrypto
-//! primitives.
+//! primitives, including the multipath nonce construction
+//! (draft-ietf-quic-multipath-11) noq-proto's path-aware calls use.
 //!
 //! These implement [`rustls::quic::Algorithm`] for the profile's two cipher
 //! suites, using the same AEAD implementations the record layer uses:
@@ -103,6 +104,48 @@ where
     ) -> Result<&'a [u8], Error> {
         let plain_len = payload.len().checked_sub(16).ok_or(Error::DecryptError)?;
         let nonce = Nonce::new(&self.iv, packet_number).0;
+        let mut tag = [0u8; 16];
+        tag.copy_from_slice(&payload[plain_len..]);
+        self.cipher
+            .decrypt_inout_detached(
+                &nonce.into(),
+                header,
+                (&mut payload[..plain_len]).into(),
+                &tag.into(),
+            )
+            .map_err(|_| Error::DecryptError)?;
+        Ok(&payload[..plain_len])
+    }
+
+    // The multipath nonce (draft-ietf-quic-multipath-11 §"Nonce
+    // Calculation"): IV XOR the 96-bit concatenation of path ID and packet
+    // number. Path 0 reduces to the RFC 9001 nonce, so noq-proto routes
+    // every packet — multipath negotiated or not — through these.
+
+    fn encrypt_in_place_for_path(
+        &self,
+        path_id: u32,
+        packet_number: u64,
+        header: &[u8],
+        payload: &mut [u8],
+    ) -> Result<quic::Tag, Error> {
+        let nonce = Nonce::for_path(path_id, &self.iv, packet_number).0;
+        let tag = self
+            .cipher
+            .encrypt_inout_detached(&nonce.into(), header, payload.into())
+            .map_err(|_| Error::EncryptError)?;
+        Ok(quic::Tag::from(tag.as_slice()))
+    }
+
+    fn decrypt_in_place_for_path<'a>(
+        &self,
+        path_id: u32,
+        packet_number: u64,
+        header: &[u8],
+        payload: &'a mut [u8],
+    ) -> Result<&'a [u8], Error> {
+        let plain_len = payload.len().checked_sub(16).ok_or(Error::DecryptError)?;
+        let nonce = Nonce::for_path(path_id, &self.iv, packet_number).0;
         let mut tag = [0u8; 16];
         tag.copy_from_slice(&payload[plain_len..]);
         self.cipher
@@ -267,7 +310,7 @@ fn xor_in_place(
 
 #[cfg(test)]
 mod tests {
-    use rustls::quic::Algorithm;
+    use rustls::quic::{Algorithm, PacketKey as _};
 
     use super::*;
 
@@ -405,6 +448,98 @@ mod tests {
             .remote
             .packet
             .decrypt_in_place(9, &[0xc3u8, 1, 2, 4], &mut buf2)
+            .is_err());
+    }
+
+    /// TLS 1.3 HKDF-Expand-Label over SHA-256, for deriving the multipath
+    /// vector's key and IV from its traffic secret.
+    fn expand_label(secret: &[u8; 32], label: &[u8], out: &mut [u8]) {
+        let hk = hkdf::Hkdf::<sha2::Sha256>::from_prk(secret).unwrap();
+        let mut info = Vec::new();
+        info.extend_from_slice(&(out.len() as u16).to_be_bytes());
+        info.push((6 + label.len()) as u8);
+        info.extend_from_slice(b"tls13 ");
+        info.extend_from_slice(label);
+        info.push(0);
+        hk.expand(&info, out).unwrap();
+    }
+
+    /// The multipath traffic secret picoquic's `multipath_aead_test` uses
+    /// (note the 35 where 25 would be — the quirk is part of the vector).
+    const MULTIPATH_SECRET: [u8; 32] = [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        35, 26, 27, 28, 29, 30, 31,
+    ];
+    const MULTIPATH_PAYLOAD: &[u8] = b"The quick brown fox jumps over the lazy dog";
+    const MULTIPATH_HEADER: &[u8] = b"This is a test";
+
+    fn multipath_packet_key() -> PacketKey<aes_gcm::Aes128Gcm> {
+        let mut key = [0u8; 16];
+        expand_label(&MULTIPATH_SECRET, b"quic key", &mut key);
+        let mut iv = [0u8; 12];
+        expand_label(&MULTIPATH_SECRET, b"quic iv", &mut iv);
+        PacketKey {
+            cipher: aes_gcm::Aes128Gcm::new_from_slice(&key).unwrap(),
+            iv: Iv::from(iv),
+            confidentiality_limit: AES_128_GCM_CONFIDENTIALITY_LIMIT,
+            integrity_limit: AES_128_GCM_INTEGRITY_LIMIT,
+        }
+    }
+
+    /// Multipath packet protection pinned to picoquic's
+    /// `multipath_aead_test` output — the same vector rustls's providers
+    /// pin their `_for_path` implementations to.
+    #[test]
+    fn multipath_aead_vector() {
+        const EXPECTED: &[u8] = &[
+            123, 139, 232, 52, 136, 25, 201, 143, 250, 89, 87, 39, 37, 63, 0, 210, 220, 227, 186,
+            140, 183, 251, 13, 203, 6, 116, 204, 100, 166, 64, 43, 185, 174, 85, 212, 163, 242,
+            141, 24, 166, 62, 228, 187, 137, 248, 31, 152, 126, 240, 151, 79, 51, 253, 130, 43,
+            114, 173, 234, 254,
+        ];
+
+        let pk = multipath_packet_key();
+        let mut buf = MULTIPATH_PAYLOAD.to_vec();
+        let tag = pk
+            .encrypt_in_place_for_path(2, 12345, MULTIPATH_HEADER, &mut buf)
+            .unwrap();
+        buf.extend_from_slice(tag.as_ref());
+        assert_eq!(buf.as_slice(), EXPECTED);
+    }
+
+    /// Path 0's multipath nonce is RFC 9001's nonce: `_for_path(0, ..)`
+    /// interoperates with the plain methods, every path round-trips, and
+    /// a packet sealed on one path does not open on another.
+    #[test]
+    fn multipath_roundtrip_and_path_zero_equivalence() {
+        let pk = multipath_packet_key();
+
+        for path_id in [0u32, 1, 2, 0xaead] {
+            let mut buf = MULTIPATH_PAYLOAD.to_vec();
+            let tag = pk
+                .encrypt_in_place_for_path(path_id, 12345, MULTIPATH_HEADER, &mut buf)
+                .unwrap();
+            buf.extend_from_slice(tag.as_ref());
+            let plain = pk
+                .decrypt_in_place_for_path(path_id, 12345, MULTIPATH_HEADER, &mut buf)
+                .unwrap();
+            assert_eq!(plain, MULTIPATH_PAYLOAD);
+        }
+
+        let mut buf = MULTIPATH_PAYLOAD.to_vec();
+        let tag = pk
+            .encrypt_in_place(12345, MULTIPATH_HEADER, &mut buf)
+            .unwrap();
+        buf.extend_from_slice(tag.as_ref());
+        let mut cross = buf.clone();
+        assert_eq!(
+            pk.decrypt_in_place_for_path(0, 12345, MULTIPATH_HEADER, &mut cross)
+                .unwrap(),
+            MULTIPATH_PAYLOAD
+        );
+        let mut wrong = buf.clone();
+        assert!(pk
+            .decrypt_in_place_for_path(1, 12345, MULTIPATH_HEADER, &mut wrong)
             .is_err());
     }
 }

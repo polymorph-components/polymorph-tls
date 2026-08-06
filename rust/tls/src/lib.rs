@@ -20,7 +20,7 @@
 //! unrepresentable is the signing rule — no constructor accepts ECDSA or
 //! RSA private key material; see [`polymorph_tls_profile::ServerIdentity`].
 //!
-//! QUIC integration (quinn compatibility) deliberately lives elsewhere:
+//! QUIC integration (the noq-proto layer) deliberately lives elsewhere:
 //! this crate is TLS only.
 
 use std::fmt;

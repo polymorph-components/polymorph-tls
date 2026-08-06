@@ -106,9 +106,7 @@ fn aead() {
     for suite in polymorph_tls_quic::provider().cipher_suites.iter() {
         let label = suite_label(suite.suite());
         let tls13 = suite.tls13().expect("profile suites are TLS 1.3");
-        let algorithm = tls13
-            .quic
-            .expect("quinn provider suites carry QUIC support");
+        let algorithm = tls13.quic.expect("QUIC provider suites carry QUIC support");
         for &size in AEAD_SIZES {
             aead_suite_size(tls13, algorithm, label, size);
         }
@@ -122,7 +120,7 @@ fn aead_suite_size(
     size: usize,
 ) {
     // Key material through the public initial-secrets derivation (the
-    // same path quinn uses); the bench measures the seal/open path, so
+    // same path noq uses); the bench measures the seal/open path, so
     // the derivation happens once, outside the timed loop. The
     // derivation is suite-generic even though real QUIC uses AES-only
     // initial keys.

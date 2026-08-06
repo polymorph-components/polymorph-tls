@@ -5,7 +5,7 @@ Guidance for automated agents (and humans) working in this repository.
 ## What this repository is
 
 `polymorph:tls`: a TLS 1.3 WIT package plus a pure-wasm implementation, with
-a quinn-proto compatibility layer serving QUIC embedders. A sibling of
+a noq-proto compatibility layer serving QUIC embedders. A sibling of
 [`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
 [`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 deliberately mirroring their architecture — prefer clarity and correctness
@@ -25,9 +25,9 @@ design record.
   the single policy source. Its README is the profile document.
 - `rust/tls` — the curated core delivery: profile provider + TLS 1.3
   configs. Deliberately QUIC-free. Its README records the provider audit.
-- `rust/quic` — quinn compatibility: RFC 9001 packet protection,
-  quinn-proto session glue, endpoint keys. The QUIC deliverable; the
-  embedder brings the transport.
+- `rust/quic` — QUIC compatibility: RFC 9001 packet protection (multipath
+  nonces included), noq-proto crypto wiring, endpoint keys. The QUIC
+  deliverable; the embedder brings the transport.
 - `rust/component` — the `polymorph:tls` component (enforced delivery);
   wasm-only cdylib, `delegated-signer` feature selects the
   `tls-delegated` world.
@@ -43,7 +43,7 @@ design record.
   excluded from wasm builds (`build-wasm` passes `--exclude`).
 - `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
   guests; `quic-loopback` also carries the QUIC interop endpoint modes
-  and its own quinn-proto-over-`wasi:sockets` driver (validation
+  and its own noq-proto-over-`wasi:sockets` driver (validation
   machinery, not a delivery).
 - `examples/tls-delegated-loopback`, `examples/test-signer`,
   `examples/webcrypto-signer` — the delegated-signer rig: the
@@ -72,7 +72,7 @@ design record.
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
 | `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `polymorph:webcrypto` provider |
 | `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider on both sockets generations — wasip3 and `std::net`/0.2 guests — with handle-address and profile-cipher-suite gates plus plain-TCP passthrough-delegation legs |
-| `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the quinn leg against quic-go over UDP in both directions |
+| `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the noq leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |
 | `just bench` | non-gating: the performance battery (packet protection, handshakes, record-path and QUIC bulk; native vs wasm vs composed component) with provenance-stamped output |
 | `just timing-lab` | the dudect-style statistical timing lab under wasmtime. Non-gating and deliberately outside `just check` (statistical; environment-sensitive; verdicts are per-runtime-version and per-microarchitecture) — a weekly scheduled workflow runs it, and timing-lab/README.md's detection limits govern how to read a verdict |
@@ -219,7 +219,7 @@ so closed numbers remain stable references.
 ## Direction
 
 The bootstrap issue set was the roadmap; the algorithm profile, WIT
-package, component, guest library, quinn compatibility layer,
+package, component, guest library, QUIC compatibility layer,
 delegated-signer bridge, interop harnesses, performance battery, and
 timing lab have landed. See the open issues for what remains
 (upstreaming, the tls-virt follow-ons).
