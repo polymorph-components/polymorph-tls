@@ -30,6 +30,7 @@ dependencies = [
  "cipher",
  "cpubits",
  "cpufeatures 0.3.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -214,6 +215,7 @@ dependencies = [
  "cipher",
  "cpufeatures 0.3.0",
  "rand_core",
+ "zeroize",
 ]
 
 [[package]]
@@ -1531,6 +1533,7 @@ dependencies = [
  "rustls-rustcrypto",
  "sha2 0.11.0",
  "subtle",
+ "zeroize",
 ]
 
 [[package]]
