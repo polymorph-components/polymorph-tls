@@ -1,14 +1,14 @@
 # `polymorph:tls`
 
-A TLS 1.3 WIT package and pure-wasm implementation, designed to serve QUIC
-over `wasi:sockets`. A sibling of
+A TLS 1.3 WIT package and pure-wasm implementation, with a quinn-proto
+compatibility layer serving QUIC embedders. A sibling of
 [`polymorph:webcrypto`](https://github.com/polymorph-components/polymorph-webcrypto) and
 [`polymorph:webrtc-datachannels`](https://github.com/polymorph-components/polymorph-webrtc-datachannels),
 following the same architecture.
 
 **Status: spike implementation.** The WIT package, the profile and its
-two deliveries, the quinn compatibility layer, and the `wasi:sockets`
-adapter exist; they pass composed smoke tests under Wasmtime,
+two deliveries, and the quinn compatibility layer exist; they pass
+composed smoke tests under Wasmtime,
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
 quic-go over real transports, and a scheduled dudect-style
 [timing lab](timing-lab/README.md), with the performance tradeoff
@@ -60,10 +60,14 @@ The central ruling: **the algorithm profile is the primary artifact**, and
 it has two deliveries.
 
 A second ruling orders the goals: **the primary goal is a generally-useful
-TLS interface and implementation.** QUIC over `wasi:sockets` is the
-motivating consumer, and quinn compatibility is a real but secondary
-requirement — delivered as a separate compatibility layer and used as the
-validation vehicle, never part of the core library.
+TLS interface and implementation.** QUIC support is a real but secondary
+requirement, served at quinn-proto's crypto seam: a separate compatibility
+layer, never part of the core library, for embedders that bring their own
+transport — component-iroh, the motivating consumer, drives quinn-proto
+over its own wires. QUIC over `wasi:sockets` à la carte is not a
+deliverable: the in-repo driver exists to validate the stack under a WASI
+runtime (smoke, interop, bench, audit) and lives inside the rig that runs
+it.
 
 - **The profile** fixes the algorithm policy once: ChaCha20-Poly1305
   preferred; fixsliced `TLS_AES_128_GCM_SHA256` present for conformance,
@@ -75,12 +79,12 @@ validation vehicle, never part of the core library.
   a world *import* — satisfiable by a host-side provider, left unwired for
   Ed25519-only deployments — so in-guest class-D signing is structurally
   unrepresentable, in the same way `component-webcrypto`'s in-guest
-  provider withholds class-D exports. The component imports `wasi:sockets`
-  (UDP), `wasi:clocks`, and `wasi:random`; its export shape should stay
-  swappable with an eventual host-terminated TLS provider (the `wasi-tls`
-  proposal), so a composition chooses in-guest versus host TLS at
-  `wac plug` time the way `component-webcrypto` compositions choose their
-  crypto provider.
+  provider withholds class-D exports. The component imports `wasi:clocks`
+  and `wasi:random` — the consumer brings the transport streams — and its
+  export shape should stay swappable with an eventual host-terminated TLS
+  provider (the `wasi-tls` proposal), so a composition chooses in-guest
+  versus host TLS at `wac plug` time the way `component-webcrypto`
+  compositions choose their crypto provider.
 - **The Rust guest library is the profile's curated delivery.** Same
   profile underneath, delivered as the ergonomic path for Rust guests. Its
   one near-airtight rule is API shape rather than configuration default:
@@ -89,8 +93,8 @@ validation vehicle, never part of the core library.
 
 The implementation path is assembly, not invention: rustls with a pure-
 RustCrypto `CryptoProvider` at the core; for the QUIC leg, `quinn-proto`
-(sans-IO QUIC) driven over `wasi:sockets` UDP by an adapter this repository
-owns.
+(sans-IO QUIC) with the profile implementing its crypto traits, the
+embedder driving the I/O.
 
 ## Performance posture
 

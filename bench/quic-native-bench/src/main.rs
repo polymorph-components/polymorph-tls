@@ -57,8 +57,8 @@ fn die(message: String) -> ! {
     std::process::exit(1);
 }
 
-/// The `std::net` counterpart of `polymorph_quinn_wasi::Driver`, pump logic
-/// mirrored step for step.
+/// The `std::net` counterpart of the quic-loopback rig's `Driver`, pump
+/// logic mirrored step for step.
 struct Driver {
     endpoint: Endpoint,
     connections: HashMap<ConnectionHandle, quinn_proto::Connection>,

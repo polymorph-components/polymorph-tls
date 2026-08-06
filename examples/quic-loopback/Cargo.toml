@@ -7,7 +7,6 @@ license.workspace = true
 publish = false
 
 [dependencies]
-polymorph-quinn-wasi = { workspace = true }
 polymorph-tls-quinn = { workspace = true }
 polymorph-tls-profile = { workspace = true }
 quinn-proto = { workspace = true }
@@ -15,4 +14,5 @@ rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 
 [target.'cfg(all(target_family = "wasm", target_os = "wasi"))'.dependencies]
+bytes = { workspace = true }
 wasi = { workspace = true }

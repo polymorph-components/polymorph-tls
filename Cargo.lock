@@ -1481,15 +1481,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "polymorph-quinn-wasi"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "quinn-proto",
- "wasi 0.14.7+wasi-0.2.4",
-]
-
-[[package]]
 name = "polymorph-tls"
 version = "0.1.0"
 dependencies = [
@@ -1644,7 +1635,7 @@ dependencies = [
 name = "quic-loopback"
 version = "0.1.0"
 dependencies = [
- "polymorph-quinn-wasi",
+ "bytes",
  "polymorph-tls-profile",
  "polymorph-tls-quinn",
  "quinn-proto",

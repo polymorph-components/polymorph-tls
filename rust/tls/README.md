@@ -23,8 +23,8 @@ a separate component's memory — should compose the component delivery
 instead (see the [repository README](../../README.md), "Design").
 
 QUIC consumers: the core is deliberately QUIC-free. The quinn
-compatibility layer is [`polymorph-tls-quinn`](../quinn/README.md), driven over
-`wasi:sockets` by [`polymorph-quinn-wasi`](../quinn-wasi/).
+compatibility layer is [`polymorph-tls-quinn`](../quinn/README.md); the
+embedder drives the I/O.
 
 ## Provider selection: `rustls-rustcrypto`
 
