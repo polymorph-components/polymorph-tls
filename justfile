@@ -54,12 +54,6 @@ smoke-tls-webcrypto:
     fi
     git -C "$checkout" fetch -q origin "$rev"
     git -C "$checkout" checkout -q "$rev"
-    # component-webcrypto's workspace expects a sibling checkout of
-    # polymorph-components/polymorph-test (a dev-layout path dependency of its
-    # conformance crates; the guest-provider build itself does not use it).
-    if [ ! -e target/component-test/.git ]; then
-        git clone --filter=blob:none https://github.com/polymorph-components/polymorph-test target/component-test
-    fi
     (cd "$checkout" && cargo build --release -p polymorph-webcrypto-guest-provider --target wasm32-wasip2)
     cargo build -p polymorph-tls-component --features delegated-signer -p webcrypto-signer -p tls-delegated-loopback --target wasm32-wasip2
     wac plug --plug "$checkout/target/wasm32-wasip2/release/polymorph_webcrypto_guest_provider.wasm" target/wasm32-wasip2/debug/webcrypto_signer.wasm -o target/wasm32-wasip2/debug/webcrypto-signer-with-provider.wasm
