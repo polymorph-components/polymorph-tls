@@ -62,7 +62,7 @@ impl quic::Algorithm for ChaCha20Poly1305Algorithm {
 
     fn header_protection_key(&self, key: AeadKey) -> Box<dyn quic::HeaderProtectionKey> {
         let key: [u8; 32] = key.as_ref().try_into().expect("invalid key length");
-        Box::new(ChaChaHeaderProtectionKey(key))
+        Box::new(ChaChaHeaderProtectionKey(zeroize::Zeroizing::new(key)))
     }
 
     fn aead_key_len(&self) -> usize {
@@ -167,7 +167,10 @@ impl quic::HeaderProtectionKey for AesHeaderProtectionKey {
     }
 }
 
-struct ChaChaHeaderProtectionKey([u8; 32]);
+// The raw key scrubs itself on drop; the AES twin needs no wrapper — its
+// expanded schedule zeroizes via the `aes` crate's `zeroize` feature, as
+// do the transient `chacha20` cipher states built per mask.
+struct ChaChaHeaderProtectionKey(zeroize::Zeroizing<[u8; 32]>);
 
 impl ChaChaHeaderProtectionKey {
     /// RFC 9001 §5.4.4: the sample's first 4 bytes are the block counter,
@@ -179,7 +182,7 @@ impl ChaChaHeaderProtectionKey {
             .map_err(|_| Error::General("sample of invalid length".into()))?;
         let counter = u32::from_le_bytes(sample[..4].try_into().unwrap());
         let nonce: [u8; 12] = sample[4..].try_into().unwrap();
-        let mut cipher = chacha20::ChaCha20::new(&self.0.into(), &nonce.into());
+        let mut cipher = chacha20::ChaCha20::new((&*self.0).into(), &nonce.into());
         cipher.seek(u64::from(counter) * 64);
         let mut mask = [0u8; 5];
         cipher.apply_keystream(&mut mask);
@@ -295,7 +298,7 @@ mod tests {
             0x5e, 0x5c, 0xd5, 0x5c, 0x41, 0xf6, 0x90, 0x80, 0x57, 0x5d, 0x79, 0x99, 0xc2, 0x5a,
             0x5b, 0xfb,
         ];
-        let key = ChaChaHeaderProtectionKey(hp_key);
+        let key = ChaChaHeaderProtectionKey(zeroize::Zeroizing::new(hp_key));
         assert_eq!(key.mask(&sample).unwrap(), [0xae, 0xfe, 0xfe, 0x7d, 0x03]);
     }
 
