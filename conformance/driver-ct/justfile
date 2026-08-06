@@ -1,0 +1,148 @@
+# The conformance-ct module: builds the shared suite and the composed
+# targets, runs them under the pinned component-test host runner, and
+# renders the matrix. Architecture in ../README.md; target facts in
+# targets.toml. Every recipe runs from the repository root.
+
+root := "../.."
+
+# Root-relative paths (every recipe starts with `cd {{root}}`).
+guest := "target/wasm32-wasip2/release/conformance_guest_ct.wasm"
+component := "target/wasm32-wasip2/release/polymorph_tls_component.wasm"
+ct := "target/ct-tools/bin/component-test"
+ct-runner := "target/ct-tools/bin/ct-runner"
+results := "conformance/driver-ct/results"
+
+# Build the suite, both component builds, and the composed targets. The
+# grep gates assert the delegated build carries the signer import (the
+# bridge is reachable, not stripped) and that composition satisfies
+# every polymorph:tls import.
+build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    mkdir -p target/conformance
+    cargo build --target wasm32-wasip2 --release -p conformance-guest-ct -p test-signer
+    cargo build --target wasm32-wasip2 --release -p polymorph-tls-component
+    cp {{component}} target/conformance/tls-plain.wasm
+    cargo build --target wasm32-wasip2 --release -p polymorph-tls-component --features delegated-signer
+    cp {{component}} target/conformance/tls-delegated-unwired.wasm
+    wasm-tools component wit target/conformance/tls-delegated-unwired.wasm | grep -q 'import polymorph:tls/signer'
+    wac plug target/conformance/tls-delegated-unwired.wasm --plug target/wasm32-wasip2/release/test_signer.wasm -o target/conformance/tls-delegated.wasm
+    wac plug {{guest}} --plug target/conformance/tls-plain.wasm -o target/conformance/suite-plain.wasm
+    wac plug {{guest}} --plug target/conformance/tls-delegated.wasm -o target/conformance/suite-delegated.wasm
+    ! wasm-tools component wit target/conformance/suite-plain.wasm | grep -q 'import polymorph:tls/'
+    ! wasm-tools component wit target/conformance/suite-delegated.wasm | grep -q 'import polymorph:tls/'
+
+# Install the component-test CLI and host runner at the revision the
+# workspace pins (read from Cargo.lock, so a bump cannot half-apply),
+# then hold every other appearance of the pin to it.
+_ct-tools:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    src=$(grep -m1 -A2 '^name = "component-test-sdk"' Cargo.lock | grep '^source = "git+')
+    url=$(printf '%s' "$src" | sed -E 's/^source = "git\+([^?]+)\?.*/\1/')
+    rev=$(printf '%s' "$src" | grep -oE '[0-9a-f]{40}' | head -n1)
+    if [ ! -x {{ct}} ] || [ "$(cat target/ct-tools/.rev 2>/dev/null)" != "$rev" ]; then
+        cargo install --locked --root target/ct-tools --git "$url" --rev "$rev" component-test-cli component-test-runner
+        printf '%s' "$rev" > target/ct-tools/.rev
+    fi
+    {{ct}} pins --cargo-lock Cargo.lock --expect "$rev" > /dev/null
+
+# Check the committed case inventory against the built suite.
+lock-check: build _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    {{ct}} lock {{guest}} --check conformance/guest-ct/tests.lock
+
+# Regenerate the case inventory after a suite change; the diff is the
+# review surface.
+lock-update: build _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    {{ct}} lock {{guest}} -o conformance/guest-ct/tests.lock
+
+# The suite over the in-guest Ed25519 posture (the `tls` world build).
+run-composed: build _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    mkdir -p {{results}}
+    {{ct-runner}} target/conformance/suite-plain.wasm \
+        --suite-artifact {{guest}} --missing delegated-signer \
+        --target composed --jsonl > {{results}}/composed.jsonl
+
+# The suite over the `tls-delegated` world build with the fixture signer.
+run-delegated: build _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    mkdir -p {{results}}
+    {{ct-runner}} target/conformance/suite-delegated.wasm \
+        --suite-artifact {{guest}} \
+        --target composed-delegated --jsonl > {{results}}/composed-delegated.jsonl
+
+# The on-demand third target: the `tls-delegated` world over the
+# webcrypto-signer shim and a real polymorph:webcrypto provider, cloned
+# and built at the rev pinned alongside the shim's vendored WIT.
+# Heavier than the standing targets and absent from `all` (which clears
+# its stale results); its results feed `aggregate` while present.
+run-webcrypto: build _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    rev="$(cat examples/webcrypto-signer/wit/deps/polymorph-webcrypto/.pinned-rev)"
+    checkout=target/webcrypto-src
+    if [ ! -e "$checkout/.git" ]; then
+        git clone --filter=blob:none https://github.com/polymorph-components/polymorph-webcrypto "$checkout"
+    fi
+    git -C "$checkout" fetch -q origin "$rev"
+    # -f: the checkout is a build cache; a previous build may have
+    # dirtied its lockfile.
+    git -C "$checkout" checkout -q -f "$rev"
+    (cd "$checkout" && cargo build --release -p polymorph-webcrypto-guest-provider --target wasm32-wasip2)
+    cargo build --target wasm32-wasip2 --release -p webcrypto-signer
+    wac plug --plug "$checkout/target/wasm32-wasip2/release/polymorph_webcrypto_guest_provider.wasm" target/wasm32-wasip2/release/webcrypto_signer.wasm -o target/conformance/webcrypto-signer-with-provider.wasm
+    wac plug target/conformance/tls-delegated-unwired.wasm --plug target/conformance/webcrypto-signer-with-provider.wasm -o target/conformance/tls-delegated-webcrypto.wasm
+    wac plug {{guest}} --plug target/conformance/tls-delegated-webcrypto.wasm -o target/conformance/suite-delegated-webcrypto.wasm
+    ! wasm-tools component wit target/conformance/suite-delegated-webcrypto.wasm | grep -q 'import polymorph:'
+    mkdir -p {{results}}
+    {{ct-runner}} target/conformance/suite-delegated-webcrypto.wasm \
+        --suite-artifact {{guest}} \
+        --target composed-delegated-webcrypto --jsonl > {{results}}/composed-delegated-webcrypto.jsonl
+
+# Validate every results file against the inventory and the manifest,
+# and render the matrix. The on-demand webcrypto results are included
+# only while present.
+aggregate: _ct-tools
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    extra=()
+    [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
+    {{ct}} aggregate \
+        --lock conformance/guest-ct/tests.lock \
+        --manifest conformance/driver-ct/targets.toml \
+        --results composed={{results}}/composed.jsonl \
+        --results composed-delegated={{results}}/composed-delegated.jsonl \
+        ${extra[@]+"${extra[@]}"} \
+        -o {{results}}/matrix.md
+
+# The standing matrix: inventory check, both standing targets,
+# aggregate. Stale on-demand webcrypto results are cleared first so the
+# standing run is deterministic.
+all: lock-check run-composed run-delegated _clear-webcrypto aggregate
+
+_clear-webcrypto:
+    rm -f results/composed-delegated-webcrypto.jsonl
+
+# The committed matrix must match what the standing targets produce.
+matrix-check:
+    diff -u matrix.md results/matrix.md
+
+# Refresh the committed matrix after an intentional coverage change;
+# the diff is the review surface.
+matrix-update:
+    cp results/matrix.md matrix.md

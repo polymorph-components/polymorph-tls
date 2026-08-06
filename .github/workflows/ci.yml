@@ -1,10 +1,10 @@
 name: CI
 
 # The pull-request gate: the same recipes a developer runs, split into the
-# static checks, the loopback/virtualizer smoke rigs, and the
-# cross-implementation interop legs. The job bodies live in the justfile;
-# the workflow only provisions the environment. The timing lab is
-# deliberately not here — it is statistical and schedule-only
+# static checks, the smoke/virtualizer rigs, the conformance matrix, and
+# the cross-implementation interop legs. The job bodies live in the
+# justfiles; the workflow only provisions the environment. The timing lab
+# is deliberately not here — it is statistical and schedule-only
 # (timing-lab.yml); `just bench` is non-gating by design.
 on:
   push:
@@ -47,9 +47,9 @@ jobs:
       - run: just check
       - run: just audit
 
-  # The loopback rigs under Wasmtime (`just smoke`) and both tls-virt
-  # deliveries against openssl over real TCP (`just smoke-tls-virt`).
-  # openssl and python3 are on the runner image.
+  # The QUIC loopback rig under Wasmtime (`just smoke-quic`) and both
+  # tls-virt deliveries against openssl over real TCP
+  # (`just smoke-tls-virt`). openssl and python3 are on the runner image.
   smoke:
     runs-on: ubuntu-latest
     # Headroom for a cold cargo cache (the tls-virt-wasmtime leg builds the
@@ -75,8 +75,75 @@ jobs:
           tool: just,wasmtime,wasm-tools,wac-cli
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - run: just smoke
+      - run: just smoke-quic
       - run: just smoke-tls-virt
+
+  # The cross-implementation conformance suite (`just conformance`): the
+  # shared guest suite composed with each delivery, run under the pinned
+  # component-test runner and validated against the committed inventory,
+  # manifest, and matrix. The aggregate action republishes the matrix to
+  # the job summary; the just gate has already gated.
+  conformance:
+    runs-on: ubuntu-latest
+    # Headroom for a cold cargo cache plus the ct-tools install.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: conformance
+          cache-all-crates: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Compute the pinned component-test revision
+        id: ct-rev
+        run: |
+          rev=$(grep -m1 -A2 '^name = "component-test-sdk"' Cargo.lock | grep -oE '[0-9a-f]{40}' | head -n1)
+          echo "rev=$rev" >> "$GITHUB_OUTPUT"
+      - name: Cache the component-test tools
+        uses: actions/cache@v4
+        with:
+          path: target/ct-tools
+          key: component-test-tools-${{ runner.os }}-${{ steps.ct-rev.outputs.rev }}-${{ hashFiles('rust-toolchain.toml') }}
+      - name: Install just, wasm-tools, and wac
+        # wac-cli has no install-action manifest; the action falls back to
+        # cargo-binstall for it, which resolves releases through
+        # api.github.com — the token moves that off the shared per-IP
+        # rate limit.
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,wasm-tools,wac-cli
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: just conformance
+      - name: Check the aggregate action refs match the pin
+        if: always()
+        run: |
+          if grep -E 'polymorph-test/actions/aggregate@[0-9a-f]{40}' .github/workflows/ci.yml | grep -qv "@${{ steps.ct-rev.outputs.rev }}"; then
+            echo "aggregate action ref skew: not at the Cargo.lock rev ${{ steps.ct-rev.outputs.rev }}" >&2
+            exit 1
+          fi
+      - name: Publish the conformance matrix
+        if: always() && hashFiles('conformance/driver-ct/results/*.jsonl') != ''
+        uses: polymorph-components/polymorph-test/actions/aggregate@824d100349dc7804c9bf1723d9b1ba0ed40fa940
+        with:
+          lock: conformance/guest-ct/tests.lock
+          manifest: conformance/driver-ct/targets.toml
+          results: |
+            composed=conformance/driver-ct/results/composed.jsonl
+            composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
+          summary-title: Conformance matrix
+          cli: target/ct-tools/bin/component-test
+      - name: Upload the conformance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-results
+          path: |
+            conformance/driver-ct/results/*.jsonl
+            conformance/driver-ct/results/matrix.md
+          retention-days: 30
 
   # Cross-implementation interop over real transports (`just interop`):
   # the composed component against OpenSSL and Go crypto/tls peers over

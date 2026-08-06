@@ -41,14 +41,20 @@ design record.
 - `rust/tls-virt-wasmtime` — the host tls-virt delivery: a wasmtime
   embedding whose sockets provider wraps wasmtime-wasi's; native crate,
   excluded from wasm builds (`build-wasm` passes `--exclude`).
-- `examples/quic-loopback`, `examples/tls-loopback` — the smoke-test
-  guests; `quic-loopback` also carries the QUIC interop endpoint modes
-  and its own noq-proto-over-`wasi:sockets` driver (validation
-  machinery, not a delivery).
-- `examples/tls-delegated-loopback`, `examples/test-signer`,
-  `examples/webcrypto-signer` — the delegated-signer rig: the
-  `tls-delegated` smoke guest, the self-contained fixture signer, and
-  the shim adapting a `polymorph:webcrypto` provider to `polymorph:tls/signer`.
+- `examples/quic-loopback` — the QUIC smoke-test guest; also carries
+  the QUIC interop endpoint modes and its own
+  noq-proto-over-`wasi:sockets` driver (validation machinery, not a
+  delivery).
+- `examples/test-signer`, `examples/webcrypto-signer` — the
+  delegated-signer plugs: the self-contained fixture signer, and the
+  shim adapting a `polymorph:webcrypto` provider to `polymorph:tls/signer`;
+  both are conformance-target compositions.
+- `conformance/` — the cross-implementation conformance suite on the
+  [`polymorph:test`](https://github.com/polymorph-components/polymorph-test)
+  harness: the shared guest suite (`guest-ct`, its committed
+  `tests.lock` the case inventory) composed with each delivery of the
+  profile, the target manifest and recipes (`driver-ct`), and the
+  committed matrix. See `conformance/README.md`.
 - `examples/tls-tcp` — the real-transport demo guest: the composed
   component over `wasi:sockets` TCP; also the TLS interop endpoint.
 - `examples/tls-virt-demo`, `examples/tls-virt-demo-p2` — the plain-TCP
@@ -70,7 +76,8 @@ design record.
 | Recipe | Verifies |
 | --- | --- |
 | `just check` | fmt, clippy (all features), workspace tests (RFC 9001 vectors, profile/provider pinning, class-D key rejection), wasm build |
-| `just smoke` | the loopback rigs under Wasmtime: QUIC over `wasi:sockets` UDP, the wac-composed TLS component (component-model async) with its import-satisfaction gate, and the `tls-delegated` composition with the fixture signer (signer-import-present and import-satisfaction gates). `just smoke-tls-webcrypto` (on demand: clones the sibling repo) runs the delegated rig over a real `polymorph:webcrypto` provider |
+| `just conformance` | the cross-implementation conformance suite (see `conformance/README.md`): the shared guest suite composed with each delivery — the `tls` world's in-guest Ed25519 posture and the `tls-delegated` world with the fixture signer — run under the pinned component-test runner with import-satisfaction and signer-reachability gates, validated against the committed case inventory (`tests.lock`) and target manifest, and diffed against the committed matrix. `just conformance-ct::run-webcrypto` (on demand: clones the sibling repo) adds the delegated posture over a real `polymorph:webcrypto` provider |
+| `just smoke-quic` | QUIC over `wasi:sockets` UDP under Wasmtime |
 | `just smoke-tls-virt` | both tls-virt deliveries against `openssl s_server` over real TCP (needs openssl + python3): the composed guest virtualizer (handle-address and import-satisfaction gates), and the wasmtime host provider on both sockets generations — wasip3 and `std::net`/0.2 guests — with handle-address and profile-cipher-suite gates plus plain-TCP passthrough-delegation legs |
 | `just interop` | cross-implementation, over real transports, fresh Ed25519 private PKI per run: the composed TLS component against OpenSSL and Go peers over TCP in both directions (including the close_notify-vs-truncation and reset scenarios), and the noq leg against quic-go over UDP in both directions |
 | `just audit` | no AES table constants reachable in the release wasm artifact |

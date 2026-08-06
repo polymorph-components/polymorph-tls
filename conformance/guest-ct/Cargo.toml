@@ -1,0 +1,19 @@
+[package]
+name = "conformance-guest-ct"
+description = "The polymorph:tls conformance suite: shared cases on the polymorph:test contract, run composed with each TLS delivery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The SDK owns the polymorph:test contract bindings (its own wit-bindgen
+# 0.60 line); the SUT bindings below must stay on the same line so the
+# two binding sets share one async runtime — mixing async-runtime
+# versions in one binary risks split waitable state.
+component-test-sdk = { workspace = true }
+wit-bindgen = { workspace = true }
+futures = { workspace = true }

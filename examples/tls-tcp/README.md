@@ -4,8 +4,8 @@ The real-transport demo and consumer example for the `polymorph:tls`
 component: TLS over actual `wasi:sockets` TCP, composed the same way an
 application would consume it.
 
-Where `tls-loopback` wires the component's streams to itself in memory,
-this app hands them to the transport with no pump loop of its own: the
+Where the conformance suite wires the component's streams to itself in
+memory, this app hands them to the transport with no pump loop of its own: the
 connection's ciphertext output stream is passed directly as the TCP
 socket's transmit stream, and the socket's receive stream is passed
 directly as the connection's ciphertext input. The transform-pair shape

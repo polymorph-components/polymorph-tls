@@ -9,8 +9,6 @@ members = [
     "rust/tls-virt-wasmtime",
     "timing-lab",
     "examples/quic-loopback",
-    "examples/tls-loopback",
-    "examples/tls-delegated-loopback",
     "examples/test-signer",
     "examples/webcrypto-signer",
     "examples/tls-tcp",
@@ -19,6 +17,7 @@ members = [
     "bench/tls-bench",
     "bench/tls-component-bench",
     "bench/quic-native-bench",
+    "conformance/guest-ct",
 ]
 resolver = "2"
 
@@ -47,6 +46,14 @@ wasi = "0.14"
 wit-bindgen = { version = "0.60", features = ["async-spawn"] }
 wasip3 = "0.7"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+
+# The conformance stack, pinned to one revision everywhere it appears:
+# this rev, the `component-test`/`ct-runner` installs derived from
+# Cargo.lock by `conformance/driver-ct/justfile`, and the
+# `polymorph-test/actions/aggregate@<rev>` refs in ci.yml (a CI grep
+# gate rejects skew). To bump: edit the rev here, run `cargo update -p
+# component-test-sdk`, and move the aggregate action refs.
+component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "824d100349dc7804c9bf1723d9b1ba0ed40fa940" }
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = { version = "0.9", features = ["zeroize"] }
