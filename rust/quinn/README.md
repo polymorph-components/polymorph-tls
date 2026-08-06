@@ -43,6 +43,7 @@ keys (`rpk_client_config`/`rpk_server_config`, RFC 7250) — see
 | Packet protection, both suites | as record protection | `chacha20poly1305`, `aes-gcm` (fixsliced) | As the [core table](../tls/README.md)'s record-protection rows. |
 | Header protection, ChaCha20 suite | A | raw `chacha20` keystream over the sample | None beyond compiler correctness. |
 | Header protection, AES suite | C | single-block fixsliced `aes` encrypt of the sample | As the core AES row. |
+| Header-protection mask application | A | uniform XOR over the caller's packet-number region, gated by `subtle` arithmetic selection (never by trip count or a branch on the pn-length bits) | Decrypt's region is always the full 4 bytes (RFC 9001 §5.4.2); encrypt's region length equals the pn length — a quinn calling shape this crate cannot widen. |
 | Retry integrity tag | exempt (secret-free) | `aes-gcm` under the published RFC 9001 §5.8 constants | The key is a public constant; nothing secret transits. |
 | Stateless reset key | A | `hmac` + `sha2` | None beyond compiler correctness. |
 | Handshake token protection | C + B | `hkdf` → `aes-gcm` (fixsliced) | As the core AES row. Tokens carry no TLS secrets. |
