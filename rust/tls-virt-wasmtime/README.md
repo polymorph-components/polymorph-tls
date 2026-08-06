@@ -98,7 +98,7 @@ offered cipher suites are the profile's, verbatim.
 ## Limits
 
 Trust roots are the repository's baked test fixtures
-(`rust/quinn/tests/testdata/ca.der`), ALPN is not offered, socket
+(`rust/quic/tests/testdata/ca.der`), ALPN is not offered, socket
 options on a tunneled socket reach the parked placeholder socket rather
 than the tunnel's transport (as does `get-address-family`), and TLS
 failures surface as `connection-reset`/stream closure with detail on

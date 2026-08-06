@@ -304,7 +304,7 @@ mod tests {
         assert!(verifier.verify_client_cert(&presented, &[], now).is_ok());
         // An X.509 certificate is not a raw public key.
         let cert =
-            CertificateDer::from(include_bytes!("../../quinn/tests/testdata/leaf.der").to_vec());
+            CertificateDer::from(include_bytes!("../../quic/tests/testdata/leaf.der").to_vec());
         assert!(verifier.verify_client_cert(&cert, &[], now).is_err());
         // Intermediates are structurally impossible under RFC 7250.
         let presented = CertificateDer::from(identity.spki_der());

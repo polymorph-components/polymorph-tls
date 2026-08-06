@@ -1,4 +1,4 @@
-# `polymorph-tls-quinn`
+# `polymorph-tls-quic`
 
 quinn compatibility for the profile. The repository's primary artifact is
 TLS ([`polymorph-tls`](../tls/README.md) is the curated core); this crate is

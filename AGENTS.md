@@ -25,7 +25,7 @@ design record.
   the single policy source. Its README is the profile document.
 - `rust/tls` — the curated core delivery: profile provider + TLS 1.3
   configs. Deliberately QUIC-free. Its README records the provider audit.
-- `rust/quinn` — quinn compatibility: RFC 9001 packet protection,
+- `rust/quic` — quinn compatibility: RFC 9001 packet protection,
   quinn-proto session glue, endpoint keys. The QUIC deliverable; the
   embedder brings the transport.
 - `rust/component` — the `polymorph:tls` component (enforced delivery);

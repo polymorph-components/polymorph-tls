@@ -23,7 +23,7 @@ a separate component's memory — should compose the component delivery
 instead (see the [repository README](../../README.md), "Design").
 
 QUIC consumers: the core is deliberately QUIC-free. The quinn
-compatibility layer is [`polymorph-tls-quinn`](../quinn/README.md); the
+compatibility layer is [`polymorph-tls-quic`](../quic/README.md); the
 embedder drives the I/O.
 
 ## Provider selection: `rustls-rustcrypto`
@@ -41,7 +41,7 @@ rather than an in-repo provider. Audit findings behind that decision:
 - **QUIC**: upstream's QUIC support is an unwired stub — every suite
   carries `quic: None` and its `quic.rs` bodies are `todo!()`. The QUIC
   packet-protection layer therefore lives in this repository
-  ([`polymorph-tls-quinn`](../quinn/README.md)), a candidate for upstream
+  ([`polymorph-tls-quic`](../quic/README.md)), a candidate for upstream
   contribution.
 - **Class-D signing code**: upstream compiles its ECDSA and RSA signing
   modules unconditionally. They are unreachable through this crate — the

@@ -25,7 +25,7 @@ log() { printf '\n=== %s\n' "$*"; }
 
 WASM=target/wasm32-wasip2/debug
 COMPOSED=$WASM/tls-virt-composed.wasm
-TESTDATA=rust/quinn/tests/testdata
+TESTDATA=rust/quic/tests/testdata
 
 log "compose"
 wac compose \

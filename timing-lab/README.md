@@ -2,7 +2,7 @@
 
 A dudect-style statistical timing lab for the TLS/QUIC deliveries'
 protocol-level secret-bearing surfaces: the `polymorph-tls` profile provider and
-record machinery, the `polymorph-tls-quinn` packet protection, and the
+record machinery, the `polymorph-tls-quic` packet protection, and the
 key-exchange and signing kernels beneath them, measured in-guest as a
 wasm32-wasip2 command under `wasmtime`. It enforces constant-time
 *execution* of the shipped code on a given runtime and machine; it is not
@@ -57,7 +57,7 @@ follows its design. The harnesses differ because the subjects differ:
   be structurally uninformative: the component's surface is
   handshake-scale (open a connection, pump streams), so µs-scale record
   and packet operations would drown in stream plumbing, and the QUIC
-  surfaces ship as a library (`polymorph-tls-quinn`), not behind the component
+  surfaces ship as a library (`polymorph-tls-quic`), not behind the component
   at all. This lab therefore measures the delivery crates in-guest at
   their protocol seams — the exact objects rustls and quinn-proto invoke.
 - The primitive coverage does **not** overlap the sibling's, despite both
@@ -146,7 +146,7 @@ does not.
 | `key-exchange/x25519`, `key-exchange/p256` | single-mid-bit vs fresh scalar, fixed peer | scalar-dependent control flow or memory access in the scalar multiplication. Crate-level (`x25519-dalek`, `p256`) by necessity: rustls draws ephemeral scalars internally, so there is no seam to inject through |
 | `record/{suite}/open-reject` | tag corrupted first vs last | the record decrypter's tag comparison, through the same `Tls13AeadAlgorithm` objects rustls drives, keyed from a real handshake's extracted traffic secrets |
 | `record/{suite}/seal` | fixed vs fresh 16 KiB plaintext | data-dependent cipher timing in the record encrypter (AES-CTR+GHASH / ChaCha20-Poly1305) |
-| `packet/{suite}/open-reject`, `packet/{suite}/seal` | as the record surfaces | RFC 9001 packet protection, through `quic::Keys` — the `polymorph-tls-quinn` delivery |
+| `packet/{suite}/open-reject`, `packet/{suite}/seal` | as the record surfaces | RFC 9001 packet protection, through `quic::Keys` — the `polymorph-tls-quic` delivery |
 | `packet/{suite}/hp-mask` | fixed vs fresh 16-byte sample, fixed key | header-protection mask derivation — input-dependent timing of the raw cipher invocation (the table-based-AES shape the profile excludes by construction) |
 | `token/aes-256-gcm/open-reject` | tag corrupted first vs last | the quinn endpoint's retry/NEW_TOKEN AEAD — attacker-supplied tokens opened under a long-lived key on unauthenticated Initials |
 | `error/record-reject` | tag corrupted first vs last | the full server rejection path — deframing, decrypt failure, alert state machine — through a live connection, fresh handshake per trial |

@@ -44,14 +44,14 @@ struct Pump {
 impl Pump {
     fn new(tls_server: rustls::ServerConfig) -> Self {
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-            polymorph_tls_quinn::ResetKey::new(b"test reset key"),
+            polymorph_tls_quic::ResetKey::new(b"test reset key"),
         )));
 
-        let quic_server: polymorph_tls_quinn::QuicServerConfig =
+        let quic_server: polymorph_tls_quic::QuicServerConfig =
             tls_server.try_into().expect("initial suite present");
         let server_config = ServerConfig::new(
             Arc::new(quic_server),
-            Arc::new(polymorph_tls_quinn::TokenKey::new(b"test token master")),
+            Arc::new(polymorph_tls_quic::TokenKey::new(b"test token master")),
         );
 
         let client = Endpoint::new(endpoint_config.clone(), None, true, None);
@@ -67,7 +67,7 @@ impl Pump {
     }
 
     fn connect(&mut self, tls_client: rustls::ClientConfig, server_name: &str) {
-        let quic_client: polymorph_tls_quinn::QuicClientConfig =
+        let quic_client: polymorph_tls_quic::QuicClientConfig =
             tls_client.try_into().expect("initial suite present");
         let config = ClientConfig::new(Arc::new(quic_client));
         let (ch, conn) = self
@@ -238,7 +238,7 @@ fn webpki_server_config() -> rustls::ServerConfig {
     let identity =
         Ed25519Identity::from_pkcs8_der(vec![CertificateDer::from(LEAF_DER.to_vec())], LEAF_KEY_P8)
             .expect("testdata leaf key is Ed25519");
-    polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
+    polymorph_tls_quic::server_config(ServerIdentity::Ed25519(identity), ALPN)
         .expect("server config builds")
 }
 
@@ -247,7 +247,7 @@ fn webpki_client_config() -> rustls::ClientConfig {
     roots
         .add(CertificateDer::from(CA_DER.to_vec()))
         .expect("testdata CA parses");
-    polymorph_tls_quinn::client_config(roots, ALPN)
+    polymorph_tls_quic::client_config(roots, ALPN)
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn handshake_and_stream_roundtrip() {
             .handshake_data()
             .expect("handshake data after Connected");
         let data = data
-            .downcast_ref::<polymorph_tls_quinn::HandshakeData>()
+            .downcast_ref::<polymorph_tls_quic::HandshakeData>()
             .expect("handshake data type");
         assert_eq!(data.server_name.as_deref(), Some("localhost"));
         assert_eq!(data.protocol.as_deref(), Some(&b"polymorph-tls-test/1"[..]));
@@ -342,10 +342,10 @@ fn rpk_mutual_handshake() {
         RpkIdentity::from_pkcs8_der(CLIENT_KEY_P8).expect("testdata client key is Ed25519");
 
     let mut pump = Pump::new(
-        polymorph_tls_quinn::rpk_server_config(&server_identity, ALPN).expect("server config"),
+        polymorph_tls_quic::rpk_server_config(&server_identity, ALPN).expect("server config"),
     );
     pump.connect(
-        polymorph_tls_quinn::rpk_client_config(
+        polymorph_tls_quic::rpk_client_config(
             &client_identity,
             &server_identity.public_key(),
             ALPN,
@@ -375,10 +375,10 @@ fn rpk_wrong_pin_fails() {
     wrong_key[0] ^= 1;
 
     let mut pump = Pump::new(
-        polymorph_tls_quinn::rpk_server_config(&server_identity, ALPN).expect("server config"),
+        polymorph_tls_quic::rpk_server_config(&server_identity, ALPN).expect("server config"),
     );
     pump.connect(
-        polymorph_tls_quinn::rpk_client_config(&client_identity, &wrong_key, ALPN)
+        polymorph_tls_quic::rpk_client_config(&client_identity, &wrong_key, ALPN)
             .expect("client config"),
         "rpk.invalid",
     );

@@ -1113,13 +1113,13 @@ fn run_lab() -> Result<(), String> {
             "packet/chacha20-poly1305/open-reject",
             "packet/chacha20-poly1305/seal",
             "packet/chacha20-poly1305/hp-mask",
-            polymorph_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
+            polymorph_tls_quic::TLS13_CHACHA20_POLY1305_SHA256,
         ),
         (
             "packet/aes-128-gcm/open-reject",
             "packet/aes-128-gcm/seal",
             "packet/aes-128-gcm/hp-mask",
-            polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256,
+            polymorph_tls_quic::TLS13_AES_128_GCM_SHA256,
         ),
     ] {
         let rig = packet_rig(suite, &mut rng)?;
@@ -1210,7 +1210,7 @@ fn run_lab() -> Result<(), String> {
     // under a long-lived key on unauthenticated Initial packets.
     {
         use quinn_proto::crypto::HandshakeTokenKey;
-        let token_key = polymorph_tls_quinn::TokenKey::new(b"timing-lab token master");
+        let token_key = polymorph_tls_quic::TokenKey::new(b"timing-lab token master");
         let aead = token_key.aead_from_hkdf(b"timing-lab token");
         let mut token = vec![0u8; TAG_PROBE_LEN];
         rng.fill(&mut token);
@@ -1369,7 +1369,7 @@ fn run_lab() -> Result<(), String> {
 
         // The packet seal under mask prep.
         {
-            let rig = packet_rig(polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256, &mut rng)?;
+            let rig = packet_rig(polymorph_tls_quic::TLS13_AES_128_GCM_SHA256, &mut rng)?;
             let mut random = vec![0u8; SEAL_LEN];
             let mut work = vec![0u8; SEAL_LEN];
             let mut inputs = Rng::new(rng.next_u64());

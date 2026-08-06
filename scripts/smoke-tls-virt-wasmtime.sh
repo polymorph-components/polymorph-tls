@@ -27,7 +27,7 @@ log() { printf '\n=== %s\n' "$*"; }
 HOST=target/debug/tls-virt-wasmtime
 DEMO_P3=target/wasm32-wasip2/debug/tls_virt_demo.wasm
 DEMO_P2=target/wasm32-wasip2/debug/tls-virt-demo-p2.wasm
-TESTDATA=rust/quinn/tests/testdata
+TESTDATA=rust/quic/tests/testdata
 
 log "fixture PKI to PEM"
 openssl x509 -inform der -in "$TESTDATA/leaf.der" -out "$work/leaf.pem"

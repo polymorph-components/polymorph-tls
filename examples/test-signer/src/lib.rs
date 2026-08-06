@@ -21,7 +21,7 @@ wit_bindgen::generate!({
 
 use exports::polymorph::tls::signer::{Guest, SignatureScheme};
 
-const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
+const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf-key.p8");
 
 struct Component;
 

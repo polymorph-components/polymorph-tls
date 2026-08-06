@@ -2,7 +2,7 @@
 members = [
     "rust/profile",
     "rust/tls",
-    "rust/quinn",
+    "rust/quic",
     "rust/component",
     "rust/tls-virt-common",
     "rust/tls-virt-guest",
@@ -40,7 +40,7 @@ quinn-proto = { version = "0.11", default-features = false }
 ed25519-dalek = { version = "3", default-features = false, features = ["alloc", "pkcs8", "zeroize"] }
 
 polymorph-tls = { path = "rust/tls" }
-polymorph-tls-quinn = { path = "rust/quinn" }
+polymorph-tls-quic = { path = "rust/quic" }
 tls-virt-common = { path = "rust/tls-virt-common" }
 
 wasi = "0.14"

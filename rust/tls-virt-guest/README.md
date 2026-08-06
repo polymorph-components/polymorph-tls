@@ -87,7 +87,7 @@ bearing for any sockets-shaped virtualizer:
 ## Limits
 
 Trust roots are the repository's baked test fixtures
-(`rust/quinn/tests/testdata/ca.der`), ALPN is not offered, socket
+(`rust/quic/tests/testdata/ca.der`), ALPN is not offered, socket
 options set before a tunneled `connect` are not migrated to the real
 socket, `get-address-family` on a tunnel reports IPv6 regardless of the
 real transport, and TLS failures surface as `connection-reset`/stream

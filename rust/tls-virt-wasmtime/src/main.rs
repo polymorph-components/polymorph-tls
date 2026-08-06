@@ -66,7 +66,7 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 /// Trust anchor for tunneled connections (the repository's test CA;
 /// see README.md).
-const ROOT: &[u8] = include_bytes!("../../quinn/tests/testdata/ca.der");
+const ROOT: &[u8] = include_bytes!("../../quic/tests/testdata/ca.der");
 
 /// Read hop size for the tunnel's receive producer.
 pub(crate) const CHUNK: usize = 16 * 1024;

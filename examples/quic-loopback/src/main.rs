@@ -24,7 +24,7 @@
 //! The `driver`/`socket`/`addr` modules are the rig's own I/O
 //! scaffolding: driving quinn-proto over `wasi:sockets` is validation
 //! machinery here, not a repository deliverable (the QUIC deliverable
-//! is `polymorph-tls-quinn`).
+//! is `polymorph-tls-quic`).
 
 #[cfg(all(target_family = "wasm", target_os = "wasi"))]
 mod addr;
@@ -61,9 +61,9 @@ mod run {
     use wasi::clocks::monotonic_clock;
     use wasi::io::poll::{self, Pollable};
 
-    const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
-    const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");
-    const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
+    const CA_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/ca.der");
+    const LEAF_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf.der");
+    const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf-key.p8");
 
     const ALPN: &[&[u8]] = &[b"quic-loopback/1"];
     const INTEROP_ALPN: &[&[u8]] = &[b"quic-interop/1"];
@@ -131,14 +131,14 @@ mod run {
         let ca = std::fs::read(ca_path).unwrap_or_else(|e| die(format!("read {ca_path}: {e}")));
 
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-            polymorph_tls_quinn::ResetKey::new(b"interop reset key (client)"),
+            polymorph_tls_quic::ResetKey::new(b"interop reset key (client)"),
         )));
         let mut roots = rustls::RootCertStore::empty();
         roots
             .add(CertificateDer::from(ca))
             .unwrap_or_else(|e| die(format!("CA certificate: {e}")));
-        let quic_client: polymorph_tls_quinn::QuicClientConfig =
-            polymorph_tls_quinn::client_config(roots, INTEROP_ALPN)
+        let quic_client: polymorph_tls_quic::QuicClientConfig =
+            polymorph_tls_quic::client_config(roots, INTEROP_ALPN)
                 .try_into()
                 .expect("initial suite");
         let mut config = ClientConfig::new(Arc::new(quic_client));
@@ -204,18 +204,18 @@ mod run {
         let key = std::fs::read(key_path).unwrap_or_else(|e| die(format!("read {key_path}: {e}")));
 
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-            polymorph_tls_quinn::ResetKey::new(b"interop reset key (server)"),
+            polymorph_tls_quic::ResetKey::new(b"interop reset key (server)"),
         )));
         let identity = Ed25519Identity::from_pkcs8_der(vec![CertificateDer::from(leaf)], &key)
             .unwrap_or_else(|e| die(format!("identity: {e}")));
         let tls_server =
-            polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), INTEROP_ALPN)
+            polymorph_tls_quic::server_config(ServerIdentity::Ed25519(identity), INTEROP_ALPN)
                 .unwrap_or_else(|e| die(format!("server config: {e}")));
-        let quic_server: polymorph_tls_quinn::QuicServerConfig =
+        let quic_server: polymorph_tls_quic::QuicServerConfig =
             tls_server.try_into().expect("initial suite");
         let mut server_config = ServerConfig::new(
             Arc::new(quic_server),
-            Arc::new(polymorph_tls_quinn::TokenKey::new(b"interop token key")),
+            Arc::new(polymorph_tls_quic::TokenKey::new(b"interop token key")),
         );
         server_config.transport = transport(INTEROP_IDLE_TIMEOUT_MS);
 
@@ -369,21 +369,20 @@ mod run {
 
         // Server.
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-            polymorph_tls_quinn::ResetKey::new(b"loopback reset key"),
+            polymorph_tls_quic::ResetKey::new(b"loopback reset key"),
         )));
         let identity = Ed25519Identity::from_pkcs8_der(
             vec![CertificateDer::from(LEAF_DER.to_vec())],
             LEAF_KEY_P8,
         )
         .expect("leaf key is Ed25519");
-        let tls_server =
-            polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
-                .expect("server config");
-        let quic_server: polymorph_tls_quinn::QuicServerConfig =
+        let tls_server = polymorph_tls_quic::server_config(ServerIdentity::Ed25519(identity), ALPN)
+            .expect("server config");
+        let quic_server: polymorph_tls_quic::QuicServerConfig =
             tls_server.try_into().expect("initial suite");
         let mut server_config = ServerConfig::new(
             Arc::new(quic_server),
-            Arc::new(polymorph_tls_quinn::TokenKey::new(b"loopback token key")),
+            Arc::new(polymorph_tls_quic::TokenKey::new(b"loopback token key")),
         );
         server_config.transport = transport(IDLE_TIMEOUT_MS);
         let mut server = Driver::new(
@@ -401,8 +400,8 @@ mod run {
         roots
             .add(CertificateDer::from(CA_DER.to_vec()))
             .expect("CA parses");
-        let quic_client: polymorph_tls_quinn::QuicClientConfig =
-            polymorph_tls_quinn::client_config(roots, ALPN)
+        let quic_client: polymorph_tls_quic::QuicClientConfig =
+            polymorph_tls_quic::client_config(roots, ALPN)
                 .try_into()
                 .expect("initial suite");
         let mut client_config = ClientConfig::new(Arc::new(quic_client));
@@ -527,21 +526,20 @@ mod run {
 
         let local = |port| SocketAddr::new(Ipv6Addr::LOCALHOST.into(), port);
         let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-            polymorph_tls_quinn::ResetKey::new(b"bench reset key"),
+            polymorph_tls_quic::ResetKey::new(b"bench reset key"),
         )));
         let identity = Ed25519Identity::from_pkcs8_der(
             vec![CertificateDer::from(LEAF_DER.to_vec())],
             LEAF_KEY_P8,
         )
         .expect("leaf key is Ed25519");
-        let tls_server =
-            polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
-                .expect("server config");
-        let quic_server: polymorph_tls_quinn::QuicServerConfig =
+        let tls_server = polymorph_tls_quic::server_config(ServerIdentity::Ed25519(identity), ALPN)
+            .expect("server config");
+        let quic_server: polymorph_tls_quic::QuicServerConfig =
             tls_server.try_into().expect("initial suite");
         let mut server_config = ServerConfig::new(
             Arc::new(quic_server),
-            Arc::new(polymorph_tls_quinn::TokenKey::new(b"bench token key")),
+            Arc::new(polymorph_tls_quic::TokenKey::new(b"bench token key")),
         );
         server_config.transport = transport.clone();
         let mut server = Driver::new(
@@ -558,8 +556,8 @@ mod run {
         roots
             .add(CertificateDer::from(CA_DER.to_vec()))
             .expect("CA parses");
-        let quic_client: polymorph_tls_quinn::QuicClientConfig =
-            polymorph_tls_quinn::client_config(roots, ALPN)
+        let quic_client: polymorph_tls_quic::QuicClientConfig =
+            polymorph_tls_quic::client_config(roots, ALPN)
                 .try_into()
                 .expect("initial suite");
         let mut client_config = ClientConfig::new(Arc::new(quic_client));

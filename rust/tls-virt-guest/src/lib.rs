@@ -54,7 +54,7 @@ use wasi::sockets::types as host;
 
 /// Trust anchors for tunneled connections (the repository's test CA;
 /// see README.md).
-const ROOTS: &[&[u8]] = &[include_bytes!("../../quinn/tests/testdata/ca.der")];
+const ROOTS: &[&[u8]] = &[include_bytes!("../../quic/tests/testdata/ca.der")];
 
 /// Stream-read hop size for the transmit splice.
 const CHUNK: usize = 16 * 1024;

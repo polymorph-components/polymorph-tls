@@ -26,9 +26,9 @@ wit_bindgen::generate!({
 use polymorph::tls::client::Connector;
 use polymorph::tls::server::{Acceptor, Identity};
 
-const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
-const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");
-const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
+const CA_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/ca.der");
+const LEAF_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf.der");
+const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf-key.p8");
 
 const ALPN: &[u8] = b"tls-delegated-loopback/1";
 const MESSAGE: &[u8] = b"hello via the composed signer";

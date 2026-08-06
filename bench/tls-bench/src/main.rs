@@ -34,9 +34,9 @@ use rustls::quic;
 use rustls::{CipherSuite, ClientConnection, ServerConnection, SupportedCipherSuite};
 use rustls_pki_types::{CertificateDer, ServerName};
 
-const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
-const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");
-const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
+const CA_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/ca.der");
+const LEAF_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf.der");
+const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf-key.p8");
 
 /// Payload sizes for the packet-protection rows: a small control
 /// packet, a full QUIC datagram, and a full TLS record.
@@ -103,7 +103,7 @@ fn suite_label(suite: CipherSuite) -> &'static str {
 // --- QUIC packet protection ---
 
 fn aead() {
-    for suite in polymorph_tls_quinn::provider().cipher_suites.iter() {
+    for suite in polymorph_tls_quic::provider().cipher_suites.iter() {
         let label = suite_label(suite.suite());
         let tls13 = suite.tls13().expect("profile suites are TLS 1.3");
         let algorithm = tls13
@@ -344,8 +344,8 @@ const BULK_CHUNK: usize = 32 * 1024;
 
 fn bulk() {
     for suite in [
-        polymorph_tls_quinn::TLS13_CHACHA20_POLY1305_SHA256,
-        polymorph_tls_quinn::TLS13_AES_128_GCM_SHA256,
+        polymorph_tls_quic::TLS13_CHACHA20_POLY1305_SHA256,
+        polymorph_tls_quic::TLS13_AES_128_GCM_SHA256,
     ] {
         let label = suite_label(suite.suite());
         let (client_config, server_config) = configs(Some(single_suite_provider(suite)));
