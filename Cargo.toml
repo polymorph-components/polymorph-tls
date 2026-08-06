@@ -35,7 +35,7 @@ rustls-pki-types = "1"
 # Pinned to the audited revision (rust/tls/README.md records the audit);
 # bump deliberately and re-audit. Upstream has no usable release.
 rustls-rustcrypto = { git = "https://github.com/RustCrypto/rustls-rustcrypto", rev = "7b44a2de957b6596d267a920d3aec0d4137defb1", default-features = false, features = ["std", "zeroize"] }
-quinn-proto = { version = "0.11", default-features = false }
+noq-proto = { version = "1.1", default-features = false, features = ["rustls"] }
 
 ed25519-dalek = { version = "3", default-features = false, features = ["alloc", "pkcs8", "zeroize"] }
 

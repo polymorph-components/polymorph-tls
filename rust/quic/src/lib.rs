@@ -1,17 +1,19 @@
-//! quinn compatibility for the profile.
+//! QUIC crypto for the profile, over noq-proto.
 //!
 //! The repository's primary artifact is TLS ([`polymorph_tls`] is the curated
-//! core); this crate is the QUIC leg: everything quinn-proto needs to run
+//! core); this crate is the QUIC leg: everything noq-proto needs to run
 //! the profile's TLS 1.3 over QUIC, kept out of the core library's
 //! dependency graph.
 //!
 //! - [`provider()`]: the profile provider with QUIC packet protection
-//!   (RFC 9001) wired into both suites.
+//!   (RFC 9001, plus the multipath nonce construction noq-proto's paths
+//!   use) wired into both suites.
 //! - [`client_config`] / [`server_config`]: rustls configs under that
 //!   provider, with the early-data settings QUIC requires.
-//! - [`QuicClientConfig`] / [`QuicServerConfig`]: quinn-proto
-//!   `crypto::Session` implementations over those configs.
-//! - [`ResetKey`] / [`TokenKey`]: the endpoint-level keys quinn-proto
+//! - [`QuicClientConfig`] / [`QuicServerConfig`]: noq-proto's own
+//!   provider-agnostic `crypto::Session` glue, re-exported; it takes the
+//!   initial suite from the config's provider.
+//! - [`ResetKey`] / [`TokenKey`]: the endpoint-level keys noq-proto
 //!   needs from its crypto backend.
 //!
 //! The same signing policy applies as in the core: the provider's key
@@ -20,7 +22,6 @@
 
 mod keys;
 mod packet;
-mod session;
 mod suites;
 
 use std::fmt;
@@ -33,7 +34,9 @@ use rustls::sign::CertifiedKey;
 use rustls_pki_types::PrivateKeyDer;
 
 pub use keys::{ResetKey, TokenKey};
-pub use session::{HandshakeData, NoInitialCipherSuite, QuicClientConfig, QuicServerConfig};
+pub use noq_proto::crypto::rustls::{
+    HandshakeData, NoInitialCipherSuite, QuicClientConfig, QuicServerConfig,
+};
 pub use suites::{TLS13_AES_128_GCM_SHA256, TLS13_CHACHA20_POLY1305_SHA256};
 
 /// The profile's `CryptoProvider` with QUIC support.

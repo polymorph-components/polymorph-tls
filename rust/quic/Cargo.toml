@@ -1,6 +1,6 @@
 [package]
 name = "polymorph-tls-quic"
-description = "quinn compatibility for the profile: RFC 9001 packet protection over RustCrypto and the quinn-proto TLS session glue"
+description = "QUIC crypto for the profile: RFC 9001 packet protection over RustCrypto, wired for noq-proto (endpoint keys included)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ polymorph-tls-profile = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 rustls-rustcrypto = { workspace = true }
-quinn-proto = { workspace = true }
+noq-proto = { workspace = true }
 
 aead = { workspace = true }
 aes = { workspace = true }

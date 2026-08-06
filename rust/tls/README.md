@@ -22,7 +22,7 @@ want the profile *enforced* — no configuration surface at all, secrets in
 a separate component's memory — should compose the component delivery
 instead (see the [repository README](../../README.md), "Design").
 
-QUIC consumers: the core is deliberately QUIC-free. The quinn
+QUIC consumers: the core is deliberately QUIC-free. The QUIC
 compatibility layer is [`polymorph-tls-quic`](../quic/README.md); the
 embedder drives the I/O.
 

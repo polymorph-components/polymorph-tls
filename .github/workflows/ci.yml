@@ -80,7 +80,7 @@ jobs:
 
   # Cross-implementation interop over real transports (`just interop`):
   # the composed component against OpenSSL and Go crypto/tls peers over
-  # TCP, and the quinn leg against quic-go over UDP, both directions,
+  # TCP, and the noq leg against quic-go over UDP, both directions,
   # under a fresh Ed25519 private PKI per run.
   interop:
     runs-on: ubuntu-latest

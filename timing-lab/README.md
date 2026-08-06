@@ -59,7 +59,7 @@ follows its design. The harnesses differ because the subjects differ:
   and packet operations would drown in stream plumbing, and the QUIC
   surfaces ship as a library (`polymorph-tls-quic`), not behind the component
   at all. This lab therefore measures the delivery crates in-guest at
-  their protocol seams — the exact objects rustls and quinn-proto invoke.
+  their protocol seams — the exact objects rustls and noq-proto invoke.
 - The primitive coverage does **not** overlap the sibling's, despite both
   building on RustCrypto: the two repositories pin different RustCrypto
   generations (there: aes 0.8 / polyval 0.6 / curve25519-dalek 4 /
@@ -148,7 +148,7 @@ does not.
 | `record/{suite}/seal` | fixed vs fresh 16 KiB plaintext | data-dependent cipher timing in the record encrypter (AES-CTR+GHASH / ChaCha20-Poly1305) |
 | `packet/{suite}/open-reject`, `packet/{suite}/seal` | as the record surfaces | RFC 9001 packet protection, through `quic::Keys` — the `polymorph-tls-quic` delivery |
 | `packet/{suite}/hp-mask` | fixed vs fresh 16-byte sample, fixed key | header-protection mask derivation — input-dependent timing of the raw cipher invocation (the table-based-AES shape the profile excludes by construction) |
-| `token/aes-256-gcm/open-reject` | tag corrupted first vs last | the quinn endpoint's retry/NEW_TOKEN AEAD — attacker-supplied tokens opened under a long-lived key on unauthenticated Initials |
+| `token/aes-256-gcm/open-reject` | tag corrupted first vs last | the noq endpoint's retry/NEW_TOKEN AEAD — attacker-supplied tokens opened under a long-lived key on unauthenticated Initials |
 | `error/record-reject` | tag corrupted first vs last | the full server rejection path — deframing, decrypt failure, alert state machine — through a live connection, fresh handshake per trial |
 
 The `handshake/server` window times only server-side processing

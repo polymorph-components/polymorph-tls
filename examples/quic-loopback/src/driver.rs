@@ -1,6 +1,6 @@
-//! Pumps a `quinn_proto::Endpoint` and its connections over one socket.
+//! Pumps a `noq_proto::Endpoint` and its connections over one socket.
 //!
-//! quinn-proto is sans-IO: it consumes received datagrams and emits
+//! noq-proto is sans-IO: it consumes received datagrams and emits
 //! datagrams-to-send plus timer deadlines. The driver is the I/O half:
 //! batched receive and transmit on the socket, due timers fired in
 //! [`Driver::pump`], and pollables plus [`Driver::next_deadline`] for
@@ -11,9 +11,9 @@ use std::net::SocketAddr;
 use std::time::Instant;
 
 use bytes::BytesMut;
-use quinn_proto::{
+use noq_proto::{
     ClientConfig, ConnectError, Connection, ConnectionEvent, ConnectionHandle, DatagramEvent,
-    Endpoint, Event,
+    Endpoint, Event, FourTuple,
 };
 use wasi::io::poll::Pollable;
 
@@ -101,8 +101,7 @@ impl Driver {
                 buf.clear();
                 match self.endpoint.handle(
                     now,
-                    remote,
-                    None,
+                    FourTuple::new(remote, None),
                     None,
                     BytesMut::from(&data[..]),
                     &mut buf,
@@ -149,7 +148,7 @@ impl Driver {
             }
             loop {
                 buf.clear();
-                match connection.poll_transmit(now, 1, &mut buf) {
+                match connection.poll_transmit(now, std::num::NonZeroUsize::MIN, &mut buf) {
                     Some(transmit) => {
                         moved = true;
                         self.outbound

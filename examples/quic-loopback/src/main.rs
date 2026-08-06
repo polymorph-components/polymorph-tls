@@ -1,4 +1,4 @@
-//! QUIC over `wasi:sockets` UDP: the profile's TLS 1.3 under quinn-proto.
+//! QUIC over `wasi:sockets` UDP: the profile's TLS 1.3 under noq-proto.
 //!
 //! With no arguments, runs the loopback smoke test: a client and server
 //! in one guest, each on its own UDP socket, exchanging a stream and
@@ -22,7 +22,7 @@
 //! access (e.g. `wasmtime run -S inherit-network`).
 //!
 //! The `driver`/`socket`/`addr` modules are the rig's own I/O
-//! scaffolding: driving quinn-proto over `wasi:sockets` is validation
+//! scaffolding: driving noq-proto over `wasi:sockets` is validation
 //! machinery here, not a repository deliverable (the QUIC deliverable
 //! is `polymorph-tls-quic`).
 
@@ -52,11 +52,11 @@ mod run {
 
     use crate::driver::Driver;
     use crate::socket::UdpSocket;
-    use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
-    use quinn_proto::{
+    use noq_proto::{
         ClientConfig, ConnectionError, ConnectionHandle, Dir, Endpoint, EndpointConfig, Event,
         ServerConfig, StreamId, TransportConfig, VarInt,
     };
+    use polymorph_tls_profile::{Ed25519Identity, ServerIdentity};
     use rustls_pki_types::CertificateDer;
     use wasi::clocks::monotonic_clock;
     use wasi::io::poll::{self, Pollable};
@@ -145,7 +145,7 @@ mod run {
         config.transport_config(transport(INTEROP_IDLE_TIMEOUT_MS));
 
         let mut driver = Driver::new(
-            Endpoint::new(endpoint_config, None, true, None),
+            Endpoint::new(endpoint_config, None, true),
             UdpSocket::bind(wildcard(remote)).expect("bind client socket"),
         );
         let handle = driver
@@ -220,7 +220,7 @@ mod run {
         server_config.transport = transport(INTEROP_IDLE_TIMEOUT_MS);
 
         let mut driver = Driver::new(
-            Endpoint::new(endpoint_config, Some(Arc::new(server_config)), true, None),
+            Endpoint::new(endpoint_config, Some(Arc::new(server_config)), true),
             UdpSocket::bind(local).expect("bind server socket"),
         );
         println!("listening on port {}", driver.local_addr().port());
@@ -274,7 +274,7 @@ mod run {
 
     /// Reads all currently available data from `id`; returns `true` once
     /// the stream is finished.
-    fn read_stream(conn: &mut quinn_proto::Connection, id: StreamId, into: &mut Vec<u8>) -> bool {
+    fn read_stream(conn: &mut noq_proto::Connection, id: StreamId, into: &mut Vec<u8>) -> bool {
         let mut recv = conn.recv_stream(id);
         let mut fin = false;
         if let Ok(mut chunks) = recv.read(true) {
@@ -386,12 +386,7 @@ mod run {
         );
         server_config.transport = transport(IDLE_TIMEOUT_MS);
         let mut server = Driver::new(
-            Endpoint::new(
-                endpoint_config.clone(),
-                Some(Arc::new(server_config)),
-                true,
-                None,
-            ),
+            Endpoint::new(endpoint_config.clone(), Some(Arc::new(server_config)), true),
             UdpSocket::bind(local(0)).expect("bind server socket"),
         );
 
@@ -407,7 +402,7 @@ mod run {
         let mut client_config = ClientConfig::new(Arc::new(quic_client));
         client_config.transport_config(transport(IDLE_TIMEOUT_MS));
         let mut client = Driver::new(
-            Endpoint::new(endpoint_config, None, true, None),
+            Endpoint::new(endpoint_config, None, true),
             UdpSocket::bind(local(0)).expect("bind client socket"),
         );
 
@@ -492,7 +487,7 @@ mod run {
 
     /// Reads and discards all currently available data from `id`;
     /// returns the byte count and whether the stream finished.
-    fn drain_stream(conn: &mut quinn_proto::Connection, id: StreamId) -> (usize, bool) {
+    fn drain_stream(conn: &mut noq_proto::Connection, id: StreamId) -> (usize, bool) {
         let mut recv = conn.recv_stream(id);
         let mut n = 0;
         let mut fin = false;
@@ -543,12 +538,7 @@ mod run {
         );
         server_config.transport = transport.clone();
         let mut server = Driver::new(
-            Endpoint::new(
-                endpoint_config.clone(),
-                Some(Arc::new(server_config)),
-                true,
-                None,
-            ),
+            Endpoint::new(endpoint_config.clone(), Some(Arc::new(server_config)), true),
             UdpSocket::bind(local(0)).expect("bind server socket"),
         );
 
@@ -563,7 +553,7 @@ mod run {
         let mut client_config = ClientConfig::new(Arc::new(quic_client));
         client_config.transport_config(transport);
         let mut client = Driver::new(
-            Endpoint::new(endpoint_config, None, true, None),
+            Endpoint::new(endpoint_config, None, true),
             UdpSocket::bind(local(0)).expect("bind client socket"),
         );
 
@@ -623,7 +613,7 @@ mod run {
                         match stream.write(&chunk[..want]) {
                             Ok(0) => break,
                             Ok(n) => written += n,
-                            Err(quinn_proto::WriteError::Blocked) => break,
+                            Err(noq_proto::WriteError::Blocked) => break,
                             Err(e) => die(format!("stream write: {e}")),
                         }
                     }

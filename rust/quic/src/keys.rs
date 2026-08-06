@@ -1,13 +1,14 @@
-//! Endpoint-level keys quinn-proto requires from its crypto backend:
+//! Endpoint-level keys noq-proto requires from its crypto backend:
 //! stateless-reset HMAC and retry-token protection.
 //!
-//! These mirror the constructions quinn's ring backend uses (HMAC-SHA-256
-//! for reset tokens; HKDF-SHA-256 into AES-256-GCM for handshake tokens) so
-//! tokens carry the same structure, just over RustCrypto implementations.
+//! These mirror the constructions noq's ring backend uses (HMAC-SHA-256
+//! for reset tokens; HKDF-SHA-256 into AES-256-GCM for handshake tokens)
+//! so tokens carry the same structure, just over RustCrypto
+//! implementations.
 
 use aead::{AeadInOut, KeyInit};
 use hmac::Mac;
-use quinn_proto::crypto;
+use noq_proto::crypto;
 use sha2::Sha256;
 
 type HmacSha256 = hmac::Hmac<Sha256>;
@@ -49,56 +50,51 @@ impl TokenKey {
     pub fn new(master_secret: &[u8]) -> Self {
         Self(hkdf::Hkdf::new(None, master_secret))
     }
-}
 
-impl crypto::HandshakeTokenKey for TokenKey {
-    fn aead_from_hkdf(&self, random_bytes: &[u8]) -> Box<dyn crypto::AeadKey> {
+    /// The per-token AEAD: a fresh AES-256-GCM key expanded from the
+    /// token nonce. A zero AEAD nonce is sound because each (key, nonce)
+    /// pair is unique per token.
+    fn derive_aead(&self, token_nonce: u128) -> aes_gcm::Aes256Gcm {
         let mut key = [0u8; 32];
         self.0
-            .expand(random_bytes, &mut key)
+            .expand(&token_nonce.to_le_bytes(), &mut key)
             .expect("32 bytes is a valid HKDF-SHA256 output length");
-        Box::new(TokenAead(
-            aes_gcm::Aes256Gcm::new_from_slice(&key).expect("invalid key length"),
-        ))
+        aes_gcm::Aes256Gcm::new_from_slice(&key).expect("invalid key length")
     }
 }
 
-struct TokenAead(aes_gcm::Aes256Gcm);
-
-// Tokens use a zero nonce: each AEAD key is derived fresh from random bytes,
-// so the (key, nonce) pair is still unique per token.
 const ZERO_NONCE: [u8; 12] = [0u8; 12];
 
-impl crypto::AeadKey for TokenAead {
-    fn seal(&self, data: &mut Vec<u8>, additional_data: &[u8]) -> Result<(), crypto::CryptoError> {
-        self.0
-            .encrypt_in_place(&ZERO_NONCE.into(), additional_data, data)
+impl crypto::HandshakeTokenKey for TokenKey {
+    fn seal(&self, token_nonce: u128, data: &mut Vec<u8>) -> Result<(), crypto::CryptoError> {
+        self.derive_aead(token_nonce)
+            .encrypt_in_place(&ZERO_NONCE.into(), &[], data)
             .map_err(|_| crypto::CryptoError)
     }
 
     fn open<'a>(
         &self,
+        token_nonce: u128,
         data: &'a mut [u8],
-        additional_data: &[u8],
-    ) -> Result<&'a mut [u8], crypto::CryptoError> {
+    ) -> Result<&'a [u8], crypto::CryptoError> {
         let plain_len = data.len().checked_sub(16).ok_or(crypto::CryptoError)?;
         let mut tag = [0u8; 16];
         tag.copy_from_slice(&data[plain_len..]);
-        self.0
+        self.derive_aead(token_nonce)
             .decrypt_inout_detached(
                 &ZERO_NONCE.into(),
-                additional_data,
+                &[],
                 (&mut data[..plain_len]).into(),
                 &tag.into(),
             )
             .map_err(|_| crypto::CryptoError)?;
-        Ok(&mut data[..plain_len])
+        Ok(&data[..plain_len])
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use quinn_proto::crypto::{HandshakeTokenKey, HmacKey};
+    use noq_proto::crypto::{HandshakeTokenKey, HmacKey};
 
     use super::*;
 
@@ -112,17 +108,16 @@ mod tests {
     }
 
     #[test]
-    fn token_aead_roundtrip() {
+    fn token_roundtrip() {
         let key = TokenKey::new(b"master");
-        let aead = key.aead_from_hkdf(b"randomness");
         let mut data = b"token contents".to_vec();
-        aead.seal(&mut data, b"aad").unwrap();
+        key.seal(7, &mut data).unwrap();
         assert_ne!(&data[..], b"token contents");
-        let plain = aead.open(&mut data, b"aad").unwrap();
+        let plain = key.open(7, &mut data).unwrap();
         assert_eq!(plain, b"token contents");
 
         let mut data2 = b"token contents".to_vec();
-        aead.seal(&mut data2, b"aad").unwrap();
-        assert!(aead.open(&mut data2, b"bad aad").is_err());
+        key.seal(7, &mut data2).unwrap();
+        assert!(key.open(8, &mut data2).is_err());
     }
 }

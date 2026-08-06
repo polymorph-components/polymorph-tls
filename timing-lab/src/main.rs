@@ -636,7 +636,7 @@ fn packet_rig(suite: rustls::SupportedCipherSuite, rng: &mut Rng) -> Result<Pack
         .tls13()
         .expect("profile suites are TLS 1.3")
         .quic_suite()
-        .expect("quinn provider suites carry QUIC support");
+        .expect("QUIC provider suites carry QUIC support");
     let mut cid = [0u8; 8];
     rng.fill(&mut cid);
     let seal = quic_suite.keys(&cid, rustls::Side::Client, rustls::quic::Version::V1);
@@ -1103,7 +1103,7 @@ fn run_lab() -> Result<(), String> {
         }
     }
 
-    // Packet-protection surfaces (RFC 9001), per suite: the quinn
+    // Packet-protection surfaces (RFC 9001), per suite: the noq
     // delivery's packet keys and header protection. The header-protection
     // classes are fixed-vs-random *sample* under a fixed key — a
     // table-based AES's timing varies with its input, which is the class-C
@@ -1205,22 +1205,23 @@ fn run_lab() -> Result<(), String> {
         }
     }
 
-    // token/open-reject: the quinn endpoint's retry/NEW_TOKEN AEAD
+    // token/open-reject: the noq endpoint's retry/NEW_TOKEN AEAD
     // (HKDF-SHA256 into AES-256-GCM) — attacker-supplied tokens opened
     // under a long-lived key on unauthenticated Initial packets.
     {
-        use quinn_proto::crypto::HandshakeTokenKey;
+        use noq_proto::crypto::HandshakeTokenKey;
+        const TOKEN_NONCE: u128 = 0x746c_7331_335f_7469_6d69_6e67;
         let token_key = polymorph_tls_quic::TokenKey::new(b"timing-lab token master");
-        let aead = token_key.aead_from_hkdf(b"timing-lab token");
         let mut token = vec![0u8; TAG_PROBE_LEN];
         rng.fill(&mut token);
         let plain = token.clone();
-        aead.seal(&mut token, b"timing-lab aad")
+        token_key
+            .seal(TOKEN_NONCE, &mut token)
             .map_err(|_| "token seal failed".to_string())?;
         let template = token;
         let mut check = template.clone();
-        let opened = aead
-            .open(&mut check, b"timing-lab aad")
+        let opened = token_key
+            .open(TOKEN_NONCE, &mut check)
             .map_err(|_| "token roundtrip failed".to_string())?;
         if opened != &plain[..] {
             return Err("token roundtrip produced wrong plaintext".into());
@@ -1229,7 +1230,7 @@ fn run_lab() -> Result<(), String> {
         let tag_at = bad.len() - TAG_LEN;
         bad[tag_at] ^= 0x01;
         let snapshot = bad.clone();
-        if aead.open(&mut bad, b"timing-lab aad").is_ok() {
+        if token_key.open(TOKEN_NONCE, &mut bad).is_ok() {
             return Err("token rig accepted a corrupted token".into());
         }
         if bad != snapshot {
@@ -1248,7 +1249,7 @@ fn run_lab() -> Result<(), String> {
                 probe[index] ^= 0x01;
                 let start = Instant::now();
                 for _ in 0..TAG_BATCH {
-                    if aead.open(&mut probe, b"timing-lab aad").is_ok() {
+                    if token_key.open(TOKEN_NONCE, &mut probe).is_ok() {
                         return Err("corrupted token accepted".into());
                     }
                 }
