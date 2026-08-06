@@ -9,7 +9,7 @@ description = "dudect-style timing lab: statistical leakage tests of the TLS/QUI
 [dependencies]
 polymorph-tls = { workspace = true }
 polymorph-tls-profile = { workspace = true }
-polymorph-tls-quinn = { workspace = true }
+polymorph-tls-quic = { workspace = true }
 quinn-proto = { workspace = true }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }

@@ -7,7 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-polymorph-tls-quinn = { workspace = true }
+polymorph-tls-quic = { workspace = true }
 polymorph-tls-profile = { workspace = true }
 quinn-proto = { workspace = true }
 rustls = { workspace = true }

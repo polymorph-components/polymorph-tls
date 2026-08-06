@@ -1,5 +1,5 @@
 [package]
-name = "polymorph-tls-quinn"
+name = "polymorph-tls-quic"
 description = "quinn compatibility for the profile: RFC 9001 packet protection over RustCrypto and the quinn-proto TLS session glue"
 version.workspace = true
 edition.workspace = true

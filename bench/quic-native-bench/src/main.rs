@@ -28,9 +28,9 @@ use quinn_proto::{
 };
 use rustls_pki_types::CertificateDer;
 
-const CA_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/ca.der");
-const LEAF_DER: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf.der");
-const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quinn/tests/testdata/leaf-key.p8");
+const CA_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/ca.der");
+const LEAF_DER: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf.der");
+const LEAF_KEY_P8: &[u8] = include_bytes!("../../../rust/quic/tests/testdata/leaf-key.p8");
 
 const ALPN: &[&[u8]] = &[b"quic-bench/1"];
 const BATCHES: usize = 3;
@@ -267,18 +267,18 @@ fn bench(mib: usize) {
 
     let local = SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 0);
     let endpoint_config = Arc::new(EndpointConfig::new(Arc::new(
-        polymorph_tls_quinn::ResetKey::new(b"bench reset key"),
+        polymorph_tls_quic::ResetKey::new(b"bench reset key"),
     )));
     let identity =
         Ed25519Identity::from_pkcs8_der(vec![CertificateDer::from(LEAF_DER.to_vec())], LEAF_KEY_P8)
             .expect("leaf key is Ed25519");
-    let tls_server = polymorph_tls_quinn::server_config(ServerIdentity::Ed25519(identity), ALPN)
+    let tls_server = polymorph_tls_quic::server_config(ServerIdentity::Ed25519(identity), ALPN)
         .expect("server config");
-    let quic_server: polymorph_tls_quinn::QuicServerConfig =
+    let quic_server: polymorph_tls_quic::QuicServerConfig =
         tls_server.try_into().expect("initial suite");
     let mut server_config = ServerConfig::new(
         Arc::new(quic_server),
-        Arc::new(polymorph_tls_quinn::TokenKey::new(b"bench token key")),
+        Arc::new(polymorph_tls_quic::TokenKey::new(b"bench token key")),
     );
     server_config.transport = transport.clone();
     let mut server = Driver::new(
@@ -295,8 +295,8 @@ fn bench(mib: usize) {
     roots
         .add(CertificateDer::from(CA_DER.to_vec()))
         .expect("CA parses");
-    let quic_client: polymorph_tls_quinn::QuicClientConfig =
-        polymorph_tls_quinn::client_config(roots, ALPN)
+    let quic_client: polymorph_tls_quic::QuicClientConfig =
+        polymorph_tls_quic::client_config(roots, ALPN)
             .try_into()
             .expect("initial suite");
     let mut client_config = ClientConfig::new(Arc::new(quic_client));

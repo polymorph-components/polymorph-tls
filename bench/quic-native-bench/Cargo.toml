@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 polymorph-tls-profile = { workspace = true }
-polymorph-tls-quinn = { workspace = true }
+polymorph-tls-quic = { workspace = true }
 quinn-proto = { workspace = true }
 bytes = "1"
 rustls = { workspace = true }
