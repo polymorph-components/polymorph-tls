@@ -11,6 +11,7 @@ use aes::cipher::{BlockCipherEncrypt, KeyIvInit, StreamCipher, StreamCipherSeek}
 use rustls::crypto::cipher::{AeadKey, Iv, Nonce};
 use rustls::quic;
 use rustls::Error;
+use subtle::{Choice, ConditionallySelectable as _};
 
 pub(crate) static AES_128_GCM: Aes128GcmAlgorithm = Aes128GcmAlgorithm;
 pub(crate) static CHACHA20_POLY1305: ChaCha20Poly1305Algorithm = ChaCha20Poly1305Algorithm;
@@ -216,6 +217,19 @@ impl quic::HeaderProtectionKey for ChaChaHeaderProtectionKey {
 /// 5; the packet-number field masks as many bytes as the (unmasked) first
 /// byte's pn-length bits say. `masked` selects whether `first` must be
 /// unmasked before reading those bits.
+///
+/// The packet-number loop is uniform: every provided byte is visited and
+/// the mask is gated by arithmetic selection, never by the loop bound or a
+/// branch. `pn_len` comes from the pn-length bits — the field header
+/// protection exists to hide, unmasked one line above on the decrypt path —
+/// so control flow that depends on it is a timing side channel. Do not
+/// "simplify" to `take(pn_len)` or an early exit: bytes at and past
+/// `pn_len` XOR with zero, which the RFC 9001 Appendix A vectors pin. On
+/// decrypt the caller always provides the full 4-byte region (§5.4.2's
+/// sampling arithmetic guarantees it exists), so uniformity here makes
+/// that path's timing independent of the protected bits; on encrypt the
+/// caller's slice is already exactly `pn_len` bytes, an upstream trait
+/// shape this function cannot widen.
 fn xor_in_place(
     mask: [u8; 5],
     first: &mut u8,
@@ -228,6 +242,7 @@ fn xor_in_place(
     }
 
     const LONG_HEADER_FORM: u8 = 0x80;
+    // The form bit is never masked (public), so this branch is benign.
     let bits = match *first & LONG_HEADER_FORM == LONG_HEADER_FORM {
         true => 0x0f,
         false => 0x1f,
@@ -240,8 +255,9 @@ fn xor_in_place(
     let pn_len = (first_plain & 0x03) as usize + 1;
 
     *first ^= first_mask & bits;
-    for (dst, m) in packet_number.iter_mut().zip(pn_mask).take(pn_len) {
-        *dst ^= m;
+    for (index, (dst, m)) in packet_number.iter_mut().zip(pn_mask).enumerate() {
+        let in_pn = Choice::from(u8::from(index < pn_len));
+        *dst ^= u8::conditional_select(&0, m, in_pn);
     }
     Ok(())
 }
@@ -281,6 +297,37 @@ mod tests {
         ];
         let key = ChaChaHeaderProtectionKey(hp_key);
         assert_eq!(key.mask(&sample).unwrap(), [0xae, 0xfe, 0xfe, 0x7d, 0x03]);
+    }
+
+    /// Guards `xor_in_place`'s uniform-loop contract: with a 2-byte packet
+    /// number, decrypt's full 4-byte region unmasks exactly the two pn
+    /// bytes — the trailing payload bytes come back untouched — and the
+    /// round trip restores the original header.
+    #[test]
+    fn header_protection_masks_only_the_pn_length() {
+        let hp_key: [u8; 16] = [
+            0x9f, 0x50, 0x44, 0x9e, 0x04, 0xa0, 0xe8, 0x10, 0x28, 0x3a, 0x1e, 0x99, 0x33, 0xad,
+            0xed, 0xd2,
+        ];
+        let sample: [u8; 16] = [
+            0xd1, 0xb1, 0xc9, 0x8d, 0xd7, 0x68, 0x9f, 0xb8, 0xec, 0x11, 0xd2, 0x42, 0xb1, 0x23,
+            0xdc, 0x9b,
+        ];
+        let key = AesHeaderProtectionKey(aes::Aes128::new_from_slice(&hp_key).unwrap());
+
+        // Short header, pn-length bits = 0b01: a 2-byte packet number.
+        let mut first = 0x41u8;
+        let mut pn = [0x00u8, 0x01];
+        quic::HeaderProtectionKey::encrypt_in_place(&key, &sample, &mut first, &mut pn).unwrap();
+        assert_ne!(first, 0x41);
+
+        // Decrypt sees the full 4-byte region the sampling arithmetic
+        // guarantees: the two masked pn bytes plus two payload bytes.
+        let mut region = [pn[0], pn[1], 0xaa, 0xbb];
+        quic::HeaderProtectionKey::decrypt_in_place(&key, &sample, &mut first, &mut region)
+            .unwrap();
+        assert_eq!(first, 0x41);
+        assert_eq!(region, [0x00, 0x01, 0xaa, 0xbb]);
     }
 
     /// RFC 9001 §A.5: ChaCha20-Poly1305 short-packet protection.
