@@ -1,0 +1,113 @@
+name: CI
+
+# The pull-request gate: the same recipes a developer runs, split into the
+# static checks, the loopback/virtualizer smoke rigs, and the
+# cross-implementation interop legs. The job bodies live in the justfile;
+# the workflow only provisions the environment. The timing lab is
+# deliberately not here — it is statistical and schedule-only
+# (timing-lab.yml); `just bench` is non-gating by design.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # `just check` (fmt, clippy all-features, workspace tests, wasm build)
+  # plus `just audit` (no table-based AES reachable in the release wasm
+  # artifact — the audit needs the release build, so it shares this job's
+  # cache).
+  rust-checks:
+    runs-on: ubuntu-latest
+    # Headroom for a cold cargo cache: clippy all-features compiles the
+    # wasmtime-embedding delivery from scratch.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust toolchain
+        # The toolchain version, wasm target, and components are pinned in
+        # rust-toolchain.toml; `rustup show` installs exactly those.
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-checks
+          cache-all-crates: true
+          # PR branches restore but never save, so they don't evict main's
+          # caches under the repository cap.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: just check
+      - run: just audit
+
+  # The loopback rigs under Wasmtime (`just smoke`) and both tls-virt
+  # deliveries against openssl over real TCP (`just smoke-tls-virt`).
+  # openssl and python3 are on the runner image.
+  smoke:
+    runs-on: ubuntu-latest
+    # Headroom for a cold cargo cache (the tls-virt-wasmtime leg builds the
+    # wasmtime embedding); the cap also stops a hung handshake from waiting
+    # out the default 6h limit.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: smoke
+          cache-all-crates: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install just, wasmtime, wasm-tools, and wac
+        # wac-cli has no install-action manifest; the action falls back to
+        # cargo-binstall for it, which resolves releases through
+        # api.github.com — the token moves that off the shared per-IP
+        # rate limit.
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,wasmtime,wasm-tools,wac-cli
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: just smoke
+      - run: just smoke-tls-virt
+
+  # Cross-implementation interop over real transports (`just interop`):
+  # the composed component against OpenSSL and Go crypto/tls peers over
+  # TCP, and the quinn leg against quic-go over UDP, both directions,
+  # under a fresh Ed25519 private PKI per run.
+  interop:
+    runs-on: ubuntu-latest
+    # Cap so a hung handshake or stuck peer fails fast.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: interop
+          cache-all-crates: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install Go (the interop peer)
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: scripts/interop/peer/go.mod
+          cache-dependency-path: scripts/interop/peer/go.sum
+      - name: Install just, wasmtime, wasm-tools, and wac
+        # wac-cli has no install-action manifest; the action falls back to
+        # cargo-binstall for it, which resolves releases through
+        # api.github.com — the token moves that off the shared per-IP
+        # rate limit.
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,wasmtime,wasm-tools,wac-cli
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: just interop
