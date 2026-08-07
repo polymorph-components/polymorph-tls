@@ -47,7 +47,9 @@ _ct-tools:
         cargo install --locked --root target/ct-tools --git "$url" --rev "$rev" component-test-cli component-test-runner
         printf '%s' "$rev" > target/ct-tools/.rev
     fi
-    {{ct}} pins --cargo-lock Cargo.lock --expect "$rev" > /dev/null
+    {{ct}} pins --cargo-lock Cargo.lock \
+        --js-lock conformance/driver-ct/jco/package-lock.json \
+        --expect "$rev" > /dev/null
 
 # Check the committed case inventory against the built suite.
 lock-check: build _ct-tools
@@ -83,6 +85,43 @@ run-delegated: build _ct-tools
     {{ct-runner}} target/conformance/suite-delegated.wasm \
         --suite-artifact {{guest}} \
         --target composed-delegated --jsonl > {{results}}/composed-delegated.jsonl
+
+# Transpile both composed artifacts for the Node legs. The stamp covers
+# the artifacts and the package.json: the transpile flags and the
+# pinned transpiler live there, and either changing must invalidate the
+# generated tree.
+_jco-prepared: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/jco
+    if [ package-lock.json -nt node_modules/.package-lock.json ]; then
+        npm ci --no-audit --no-fund
+    fi
+    stamp=$(cat ../../../target/conformance/suite-plain.wasm \
+        ../../../target/conformance/suite-delegated.wasm \
+        package.json | sha256sum | cut -d' ' -f1)
+    if [ "$(cat generated/.stamp 2>/dev/null || true)" != "$stamp" ]; then
+        npm run --silent transpile
+        npm run --silent transpile:delegated
+        printf '%s' "$stamp" > generated/.stamp
+    fi
+
+# The suite over the in-guest Ed25519 posture, under Node 24 JSPI.
+run-jco-node: _jco-prepared
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/jco
+    node --experimental-wasm-jspi run-node.mjs --suite suite-plain \
+        --missing delegated-signer --target jco-node
+
+# The suite over the delegated build with the fixture signer, under
+# Node 24 JSPI.
+run-jco-node-delegated: _jco-prepared
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/jco
+    node --experimental-wasm-jspi run-node.mjs --suite suite-delegated \
+        --target jco-node-delegated
 
 # The on-demand third target: the `tls-delegated` world over the
 # webcrypto-signer shim and a real polymorph:webcrypto provider, cloned
@@ -127,13 +166,15 @@ aggregate: _ct-tools
         --manifest conformance/driver-ct/targets.toml \
         --results composed={{results}}/composed.jsonl \
         --results composed-delegated={{results}}/composed-delegated.jsonl \
+        --results jco-node={{results}}/jco-node.jsonl \
+        --results jco-node-delegated={{results}}/jco-node-delegated.jsonl \
         ${extra[@]+"${extra[@]}"} \
         -o {{results}}/matrix.md
 
-# The standing matrix: inventory check, both standing targets,
+# The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl

@@ -101,6 +101,15 @@ jobs:
         # install, and the pins gate; `just conformance`'s _ct-tools
         # recognizes the stamped install and does not repeat it.
         uses: polymorph-components/polymorph-test/actions/setup@76c094576076284c1a7d0ea1b7bb724e9e7384a5
+        with:
+          js-locks: |
+            conformance/driver-ct/jco/package-lock.json
+      - name: Set up Node 24 (the jco-node legs; JSPI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: conformance/driver-ct/jco/package-lock.json
       - name: Install just, wasm-tools, and wac
         # wac-cli has no install-action manifest; the action falls back to
         # cargo-binstall for it, which resolves releases through
@@ -121,6 +130,8 @@ jobs:
           results: |
             composed=conformance/driver-ct/results/composed.jsonl
             composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
+            jco-node=conformance/driver-ct/results/jco-node.jsonl
+            jco-node-delegated=conformance/driver-ct/results/jco-node-delegated.jsonl
           summary-title: Conformance matrix
           cli: target/ct-tools/bin/component-test
           # The action fails on a uses: ref that skews from this pin.

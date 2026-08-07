@@ -1,12 +1,14 @@
 # Target capability manifest for the polymorph:tls conformance suite.
 # A target is a composition of the shared suite with one delivery of
-# the algorithm profile, run by the generic component-test host runner
-# (`ct-runner`; the composed artifact imports only wasi and
-# test-context).
+# the algorithm profile: the wasmtime rows run under the generic
+# component-test host runner (the composed artifact imports only wasi
+# and test-context), and the jco-node rows run the same artifacts
+# transpiled, under Node 24 JSPI (driver-ct/jco/run-node.mjs; the
+# transpiler is the lann/jco all-fixes pre-release pinned in
+# driver-ct/jco/package.json).
 #
-# jco targets (Node, browser) are absent: transpiling the composed
-# artifact trips two upstream jco defects in the p3 stream/future
-# path once the composition is wasm-to-wasm. Tracked in issue #28.
+# jco-browser rows are deferred until the shared browser page driver
+# exists — issue #32 (upstream: polymorph-test#59).
 version = "0.1"
 
 # The target's TLS stack has a composed `polymorph:tls/signer`, so
@@ -23,6 +25,14 @@ missing-features = ["delegated-signer"]
 # The suite plugged with the `tls-delegated` world build carrying the
 # fixture signer (examples/test-signer, Ed25519).
 [targets.composed-delegated]
+missing-features = []
+
+# The composed artifact, transpiled and run under Node 24 JSPI.
+[targets.jco-node]
+missing-features = ["delegated-signer"]
+
+# The composed-delegated artifact under Node 24 JSPI.
+[targets.jco-node-delegated]
 missing-features = []
 
 # As composed-delegated, but the signer is the webcrypto-signer shim
