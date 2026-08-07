@@ -100,7 +100,7 @@ jobs:
         # Owns the rev derivation, the rev-keyed tools cache, the
         # install, and the pins gate; `just conformance`'s _ct-tools
         # recognizes the stamped install and does not repeat it.
-        uses: polymorph-components/polymorph-test/actions/setup@eabd159de34e38a6f2f32204ceb52392555f32d8
+        uses: polymorph-components/polymorph-test/actions/setup@2436bb9fd233ec514f10de613556a7a61bbb8476
         with:
           js-locks: |
             conformance/driver-ct/jco/package-lock.json
@@ -123,7 +123,7 @@ jobs:
       - run: just conformance
       - name: Publish the conformance matrix
         if: always() && hashFiles('conformance/driver-ct/results/*.jsonl') != ''
-        uses: polymorph-components/polymorph-test/actions/aggregate@eabd159de34e38a6f2f32204ceb52392555f32d8
+        uses: polymorph-components/polymorph-test/actions/aggregate@2436bb9fd233ec514f10de613556a7a61bbb8476
         with:
           lock: conformance/guest-ct/tests.lock
           manifest: conformance/driver-ct/targets.toml
@@ -132,6 +132,8 @@ jobs:
             composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
             jco-node=conformance/driver-ct/results/jco-node.jsonl
             jco-node-delegated=conformance/driver-ct/results/jco-node-delegated.jsonl
+            jco-browser=conformance/driver-ct/results/jco-browser.jsonl
+            jco-browser-delegated=conformance/driver-ct/results/jco-browser-delegated.jsonl
           summary-title: Conformance matrix
           cli: target/ct-tools/bin/component-test
           # The action fails on a uses: ref that skews from this pin.

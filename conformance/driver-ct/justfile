@@ -160,7 +160,9 @@ aggregate: _ct-tools
     set -euo pipefail
     cd {{root}}
     extra=()
-    [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
+    [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra+=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
+    [ -f {{results}}/jco-browser.jsonl ] && extra+=(--results jco-browser={{results}}/jco-browser.jsonl)
+    [ -f {{results}}/jco-browser-delegated.jsonl ] && extra+=(--results jco-browser-delegated={{results}}/jco-browser-delegated.jsonl)
     {{ct}} aggregate \
         --lock conformance/guest-ct/tests.lock \
         --manifest conformance/driver-ct/targets.toml \
@@ -171,10 +173,31 @@ aggregate: _ct-tools
         ${extra[@]+"${extra[@]}"} \
         -o {{results}}/matrix.md
 
+# The browser targets: both composed artifacts inside headless
+# Chromium via the upstream page driver. Gates in CI; locally opt-in.
+run-browser: _jco-prepared
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/jco
+    node run-browser.mjs
+
+# Runs the browser leg under CI or CONFORMANCE_BROWSER=1; otherwise
+# clears stale browser results so the standing run is deterministic.
+_run-browser-if-enabled:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CONFORMANCE_BROWSER:-}" = "1" ]; then
+        cd {{root}} && just conformance-ct::run-browser
+    else
+        cd {{root}}
+        rm -f {{results}}/jco-browser.jsonl {{results}}/jco-browser-delegated.jsonl
+        echo "browser leg skipped (set CONFORMANCE_BROWSER=1, needs Chrome/Chromium)"
+    fi
+
 # The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated _run-browser-if-enabled _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl

@@ -7,12 +7,14 @@
   "scripts": {
     "transpile": "component-test-jco-transpile transpile ../../../target/conformance/suite-plain.wasm --name suite-plain -I async -o generated",
     "transpile:delegated": "component-test-jco-transpile transpile ../../../target/conformance/suite-delegated.wasm --name suite-delegated -I async -o generated",
-    "run:node": "node --experimental-wasm-jspi run-node.mjs"
+    "run:node": "node --experimental-wasm-jspi run-node.mjs",
+    "run:browser": "node run-browser.mjs"
   },
   "devDependencies": {
     "@bytecodealliance/jco-transpile": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-jco-transpile-0.6.3-gdbad4d7.tgz",
     "@bytecodealliance/preview2-shim": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-preview2-shim-0.20.1-gdbad4d7.tgz",
-    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#eabd159de34e38a6f2f32204ceb52392555f32d8"
+    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#2436bb9fd233ec514f10de613556a7a61bbb8476",
+    "playwright-core": "1.62.1"
   },
   "engines": {
     "node": ">=24"
