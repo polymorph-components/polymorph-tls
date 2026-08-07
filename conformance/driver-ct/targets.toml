@@ -7,8 +7,11 @@
 # transpiler is the lann/jco all-fixes pre-release pinned in
 # driver-ct/jco/package.json).
 #
-# jco-browser rows are deferred until the shared browser page driver
-# exists — issue #32 (upstream: polymorph-test#59).
+# The jco-browser rows run the same transpiles inside headless
+# Chromium via the upstream page driver (driver-ct/jco/run-browser.mjs).
+# They gate in CI (the Actions image ships Chrome); locally they run
+# under CONFORMANCE_BROWSER=1, so both are declared optional — a
+# missing results file is a warning, not an error.
 version = "0.1"
 
 # The target's TLS stack has a composed `polymorph:tls/signer`, so
@@ -42,5 +45,15 @@ missing-features = []
 # (`just conformance-ct::run-webcrypto`) and absent from CI runs and
 # the committed matrix.
 [targets.composed-delegated-webcrypto]
+missing-features = []
+optional = true
+
+# The composed artifact inside headless Chromium.
+[targets.jco-browser]
+missing-features = ["delegated-signer"]
+optional = true
+
+# The composed-delegated artifact inside headless Chromium.
+[targets.jco-browser-delegated]
 missing-features = []
 optional = true
