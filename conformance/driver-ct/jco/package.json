@@ -12,7 +12,7 @@
   "devDependencies": {
     "@bytecodealliance/jco-transpile": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-jco-transpile-0.6.3-gdbad4d7.tgz",
     "@bytecodealliance/preview2-shim": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-preview2-shim-0.20.1-gdbad4d7.tgz",
-    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#76c094576076284c1a7d0ea1b7bb724e9e7384a5"
+    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#eabd159de34e38a6f2f32204ceb52392555f32d8"
   },
   "engines": {
     "node": ">=24"
