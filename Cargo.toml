@@ -50,10 +50,11 @@ futures = { version = "0.3", default-features = false, features = ["std", "async
 # The conformance stack, pinned to one revision everywhere it appears:
 # this rev, the `component-test`/`ct-runner` installs derived from
 # Cargo.lock by `conformance/driver-ct/justfile`, and the
-# `polymorph-test/actions/aggregate@<rev>` refs in ci.yml (a CI grep
-# gate rejects skew). To bump: edit the rev here, run `cargo update -p
-# component-test-sdk`, and move the aggregate action refs.
-component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "824d100349dc7804c9bf1723d9b1ba0ed40fa940" }
+# `polymorph-test/actions/*@<rev>` refs in ci.yml (the actions fail on
+# skew). To bump: `component-test pins bump <rev> --cargo-toml
+# Cargo.toml --workflow .github/workflows/ci.yml`, then the follow-ups
+# it prints.
+component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "76c094576076284c1a7d0ea1b7bb724e9e7384a5" }
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = { version = "0.9", features = ["zeroize"] }
