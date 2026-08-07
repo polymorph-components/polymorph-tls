@@ -7,8 +7,11 @@ compatibility layer serving QUIC embedders. A sibling of
 following the same architecture.
 
 **Status: spike implementation.** The WIT package, the profile and its
-two deliveries, and the QUIC compatibility layer exist; they pass
-composed smoke tests under Wasmtime,
+two deliveries, and the QUIC compatibility layer exist; they pass a
+cross-implementation [conformance suite](conformance/README.md) on the
+[`polymorph:test`](https://github.com/polymorph-components/polymorph-test)
+harness (one shared guest suite against every composed delivery, under
+Wasmtime — jco targets pending upstream fixes),
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
 quic-go over real transports, and a scheduled dudect-style
 [timing lab](timing-lab/README.md), with the performance tradeoff

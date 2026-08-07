@@ -1,0 +1,36 @@
+# Target capability manifest for the polymorph:tls conformance suite.
+# A target is a composition of the shared suite with one delivery of
+# the algorithm profile, run by the generic component-test host runner
+# (`ct-runner`; the composed artifact imports only wasi and
+# test-context).
+#
+# jco targets (Node, browser) are absent: transpiling the composed
+# artifact trips two upstream jco defects in the p3 stream/future
+# path once the composition is wasm-to-wasm. Tracked in issue #28.
+version = "0.1"
+
+# The target's TLS stack has a composed `polymorph:tls/signer`, so
+# delegated identities are constructible. Targets without it run the
+# `!delegated-signer` decline case instead.
+[features.delegated-signer]
+kind = "gated"
+
+# The suite plugged with the `tls` world build: in-guest Ed25519
+# signing only.
+[targets.composed]
+missing-features = ["delegated-signer"]
+
+# The suite plugged with the `tls-delegated` world build carrying the
+# fixture signer (examples/test-signer, Ed25519).
+[targets.composed-delegated]
+missing-features = []
+
+# As composed-delegated, but the signer is the webcrypto-signer shim
+# over a real polymorph:webcrypto provider (the sibling repository,
+# cloned and built at the rev pinned alongside the shim's vendored
+# WIT). Heavier than the standing targets, so on demand
+# (`just conformance-ct::run-webcrypto`) and absent from CI runs and
+# the committed matrix.
+[targets.composed-delegated-webcrypto]
+missing-features = []
+optional = true
