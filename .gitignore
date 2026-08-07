@@ -1,2 +1,4 @@
 /target
 /conformance/driver-ct/results/
+/conformance/driver-ct/jco/node_modules/
+/conformance/driver-ct/jco/generated/
