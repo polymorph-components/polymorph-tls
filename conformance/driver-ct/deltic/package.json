@@ -1,0 +1,10 @@
+{
+  "name": "@polymorph/tls-conformance-deltic-browser",
+  "private": true,
+  "type": "module",
+  "description": "Node driver for the deltic-browser conformance rows: the composed artifacts runtime-linked inside headless Chromium through the upstream page driver and deltic worker.",
+  "dependencies": {
+    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#b4026866e481ead0738742e3b380601b605e5350",
+    "playwright-core": "1.62.1"
+  }
+}

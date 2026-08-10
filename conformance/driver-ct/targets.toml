@@ -67,3 +67,15 @@ optional = true
 [targets.jco-browser-delegated]
 missing-features = []
 optional = true
+
+# The composed artifact runtime-linked inside headless Chromium (the
+# upstream deltic worker; no transpile step).
+[targets.deltic-browser]
+missing-features = ["delegated-signer"]
+optional = true
+
+# The composed-delegated artifact runtime-linked inside headless
+# Chromium.
+[targets.deltic-browser-delegated]
+missing-features = []
+optional = true

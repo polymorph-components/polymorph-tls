@@ -55,7 +55,7 @@ futures = { version = "0.3", default-features = false, features = ["std", "async
 # --cargo-toml Cargo.toml --package-json
 # conformance/driver-ct/jco/package.json --workflow
 # .github/workflows/ci.yml`, then the follow-ups it prints.
-component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "2436bb9fd233ec514f10de613556a7a61bbb8476" }
+component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "b4026866e481ead0738742e3b380601b605e5350" }
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = { version = "0.9", features = ["zeroize"] }

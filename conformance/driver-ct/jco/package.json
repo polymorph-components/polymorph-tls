@@ -5,15 +5,15 @@
   "type": "module",
   "description": "jco-node legs for the component-test conformance suite: transpile the composed artifacts (suite + TLS delivery, fused by wac) and run them under Node 24 JSPI against the upstream harness core; the artifacts import only wasi 0.2 and test-context, so there is no SUT host module.",
   "scripts": {
-    "transpile": "component-test-jco-transpile transpile ../../../target/conformance/suite-plain.wasm --name suite-plain -I async -o generated",
-    "transpile:delegated": "component-test-jco-transpile transpile ../../../target/conformance/suite-delegated.wasm --name suite-delegated -I async -o generated",
+    "transpile": "node ./jco-transpile.mjs transpile ../../../target/conformance/suite-plain.wasm --name suite-plain -I async -o generated",
+    "transpile:delegated": "node ./jco-transpile.mjs transpile ../../../target/conformance/suite-delegated.wasm --name suite-delegated -I async -o generated",
     "run:node": "node --experimental-wasm-jspi run-node.mjs",
     "run:browser": "node run-browser.mjs"
   },
   "devDependencies": {
     "@bytecodealliance/jco-transpile": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-jco-transpile-0.6.3-gdbad4d7.tgz",
     "@bytecodealliance/preview2-shim": "https://github.com/lann/jco/releases/download/all-fixes-dbad4d7/bytecodealliance-preview2-shim-0.20.1-gdbad4d7.tgz",
-    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#2436bb9fd233ec514f10de613556a7a61bbb8476",
+    "@polymorph/component-test-js": "github:polymorph-components/polymorph-test#b4026866e481ead0738742e3b380601b605e5350",
     "playwright-core": "1.62.1"
   },
   "engines": {
