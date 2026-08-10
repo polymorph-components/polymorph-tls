@@ -1,0 +1,101 @@
+# CI job bodies: each workflow job runs exactly one `gha::` recipe, so
+# `just ci` is exactly CI and the workflow files carry no logic beyond
+# environment setup.
+
+set working-directory := '..'
+
+# Wrap one recipe in a GitHub Actions log group (plain passthrough
+# locally).
+[private]
+_step recipe:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+        echo "::group::just {{recipe}}"
+        status=0
+        just {{recipe}} || status=$?
+        echo "::endgroup::"
+        if [ $status -ne 0 ]; then
+            echo "::error title=just {{recipe}} failed::exit status $status"
+            exit $status
+        fi
+    else
+        just {{recipe}}
+    fi
+
+# The static checks — fmt, clippy, workspace tests, wasm build — plus the
+# release-wasm AES-table audit, which needs the release build and so
+# shares this job's cache.
+rust-checks:
+    @just gha::_step fmt-check
+    @just gha::_step clippy
+    @just gha::_step test
+    @just gha::_step build-wasm
+    @just gha::_step audit
+
+# The QUIC loopback rig under Wasmtime and both tls-virt deliveries
+# against openssl over real TCP.
+smoke:
+    @just gha::_step smoke-quic
+    @just gha::_step smoke-tls-virt
+
+# The cross-implementation conformance suite: the shared guest suite
+# composed with each delivery, the aggregated matrix diffed against the
+# committed one.
+conformance-checks:
+    @just gha::_step conformance-ct::all
+    @just gha::_step conformance-ct::matrix-check
+
+# Cross-implementation interop over real transports: the composed
+# component against OpenSSL and Go peers over TCP, and the noq leg
+# against quic-go over UDP.
+interop:
+    @just gha::_step interop-tls
+    @just gha::_step interop-quic
+
+# The timing lab workflow's entry point (timing-lab.yml, schedule-only,
+# not a `ci` job): one retry at 4x samples before reporting failure — a
+# flake washes out at 4x while a real leak's t grows, so the retry
+# separates them; shared runners make the retry mandatory rather than
+# optional. Records the environment the verdicts are valid for (verdicts
+# hold per runtime version and per microarchitecture; a wasmtime upgrade
+# or a runner change invalidates previous quiet readings). Under GitHub
+# Actions the report also lands in the job summary.
+timing-lab-scheduled:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    samples="${TIMING_LAB_SAMPLES:-2000}"
+    cpu=$(sed -n 's/^model name[^:]*: //p' /proc/cpuinfo | head -n1)
+    [ -n "$cpu" ] || cpu="$(sed -n 's/^CPU implementer[^:]*: /implementer /p' /proc/cpuinfo | head -n1)"
+    environment="$(wasmtime --version), $(uname -m), ${cpu:-unknown CPU}"
+    echo "timing lab environment: ${environment}"
+    run() { TIMING_LAB_SAMPLES="$1" just timing-lab 2>&1; }
+
+    report=$(run "$samples"); status=$?
+    printf '%s\n' "$report"
+    if [ $status -ne 0 ]; then
+        samples=$(( samples * 4 ))
+        echo
+        echo "timing lab: verdicts diverged; retrying at ${samples} samples/class before reporting failure."
+        report=$(run "$samples"); status=$?
+        printf '%s\n' "$report"
+    fi
+
+    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+        {
+            echo "### timing lab — ${samples} samples/class"
+            echo
+            echo "Environment: ${environment}"
+            echo
+            # The lab prints its report as a markdown table; lift it verbatim.
+            printf '%s\n' "$report" | sed -n '/^| surface/,/^$/p'
+            if [ $status -eq 0 ]; then
+                echo "All surfaces matched expectations."
+            else
+                echo "**Surfaces diverged from expectation, and again on a retry at ${samples} samples/class.**"
+                echo "A quiet positive control means the harness cannot detect leaks at this"
+                echo "measurement distance; a LEAK on a real surface warrants investigation."
+            fi
+        } >> "$GITHUB_STEP_SUMMARY"
+    fi
+    exit $status

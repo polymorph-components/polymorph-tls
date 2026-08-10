@@ -57,6 +57,6 @@ jobs:
           tool: just,wasmtime
 
       - name: Run the timing lab
-        run: just timing-lab-scheduled
+        run: just gha::timing-lab-scheduled
         env:
           TIMING_LAB_SAMPLES: ${{ inputs.samples || '2000' }}
