@@ -11,7 +11,8 @@ two deliveries, and the QUIC compatibility layer exist; they pass a
 cross-implementation [conformance suite](conformance/README.md) on the
 [`polymorph:test`](https://github.com/polymorph-components/polymorph-test)
 harness (one shared guest suite against every composed delivery, under
-Wasmtime, under Node/jco via JSPI, and in headless Chromium),
+Wasmtime and, runtime-linked via deltic, under stock Deno and in
+headless Chromium),
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
 quic-go over real transports, and a scheduled dudect-style
 [timing lab](timing-lab/README.md), with the performance tradeoff
