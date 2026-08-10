@@ -105,6 +105,10 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: conformance/driver-ct/jco/package-lock.json
+      - name: Set up Deno (the deltic-deno legs; stock, no flags)
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.9.5"
       - name: Install just, wasm-tools, and wac
         # wac-cli has no install-action manifest; the action falls back to
         # cargo-binstall for it, which resolves releases through
@@ -127,6 +131,8 @@ jobs:
             composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
             jco-node=conformance/driver-ct/results/jco-node.jsonl
             jco-node-delegated=conformance/driver-ct/results/jco-node-delegated.jsonl
+            deltic-deno=conformance/driver-ct/results/deltic-deno.jsonl
+            deltic-deno-delegated=conformance/driver-ct/results/deltic-deno-delegated.jsonl
             jco-browser=conformance/driver-ct/results/jco-browser.jsonl
             jco-browser-delegated=conformance/driver-ct/results/jco-browser-delegated.jsonl
           summary-title: Conformance matrix

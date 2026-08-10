@@ -123,6 +123,34 @@ run-jco-node-delegated: _jco-prepared
     node --experimental-wasm-jspi run-node.mjs --suite suite-delegated \
         --target jco-node-delegated
 
+# The composed artifact runtime-linked under deltic on stock Deno —
+# no transpile step, no generated tree, no engine flag (callback ABI).
+# The pin and the module-graph lock live in deltic/ (see its README).
+run-deltic: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/deltic
+    translator=$(deno run --allow-read=. --allow-write=../../../target/deltic \
+        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
+        fetch-translator.ts)
+    deno run --allow-read=../../..,"$translator" --allow-write=../results \
+        --config deno.json --frozen run.ts \
+        --suite suite-plain --missing delegated-signer \
+        --target deltic-deno --translator "$translator"
+
+# The composed-delegated artifact under deltic on stock Deno.
+run-deltic-delegated: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/deltic
+    translator=$(deno run --allow-read=. --allow-write=../../../target/deltic \
+        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
+        fetch-translator.ts)
+    deno run --allow-read=../../..,"$translator" --allow-write=../results \
+        --config deno.json --frozen run.ts \
+        --suite suite-delegated \
+        --target deltic-deno-delegated --translator "$translator"
+
 # The on-demand third target: the `tls-delegated` world over the
 # webcrypto-signer shim and a real polymorph:webcrypto provider, cloned
 # and built at the rev pinned alongside the shim's vendored WIT.
@@ -170,6 +198,8 @@ aggregate: _ct-tools
         --results composed-delegated={{results}}/composed-delegated.jsonl \
         --results jco-node={{results}}/jco-node.jsonl \
         --results jco-node-delegated={{results}}/jco-node-delegated.jsonl \
+        --results deltic-deno={{results}}/deltic-deno.jsonl \
+        --results deltic-deno-delegated={{results}}/deltic-deno-delegated.jsonl \
         ${extra[@]+"${extra[@]}"} \
         -o {{results}}/matrix.md
 
@@ -197,7 +227,7 @@ _run-browser-if-enabled:
 # The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated _run-browser-if-enabled _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated run-deltic run-deltic-delegated _run-browser-if-enabled _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl

@@ -38,6 +38,8 @@ JSPI — one suite, one composition, two engines.
 | `composed-delegated-webcrypto` | as above, but the signer is the `examples/webcrypto-signer` shim over a real `polymorph:webcrypto` provider; on demand (`just conformance-ct::run-webcrypto`), declared `optional` |
 | `jco-node` | the `composed` artifact, transpiled, under Node 24 JSPI |
 | `jco-node-delegated` | the `composed-delegated` artifact, likewise |
+| `deltic-deno` | the `composed` artifact runtime-linked under deltic on stock Deno (no transpile, no engine flag) |
+| `deltic-deno-delegated` | the `composed-delegated` artifact, likewise |
 | `jco-browser` | the `composed` artifact inside headless Chromium (the upstream page driver; gates in CI, locally `CONFORMANCE_BROWSER=1`; declared `optional`) |
 | `jco-browser-delegated` | the `composed-delegated` artifact, likewise |
 
