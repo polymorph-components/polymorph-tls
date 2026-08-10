@@ -313,7 +313,7 @@ dependencies = [
 [[package]]
 name = "component-test-core"
 version = "0.1.0"
-source = "git+https://github.com/polymorph-components/polymorph-test?rev=2436bb9fd233ec514f10de613556a7a61bbb8476#2436bb9fd233ec514f10de613556a7a61bbb8476"
+source = "git+https://github.com/polymorph-components/polymorph-test?rev=b4026866e481ead0738742e3b380601b605e5350#b4026866e481ead0738742e3b380601b605e5350"
 dependencies = [
  "arcstr",
  "serde",
@@ -322,7 +322,7 @@ dependencies = [
 [[package]]
 name = "component-test-sdk"
 version = "0.1.0"
-source = "git+https://github.com/polymorph-components/polymorph-test?rev=2436bb9fd233ec514f10de613556a7a61bbb8476#2436bb9fd233ec514f10de613556a7a61bbb8476"
+source = "git+https://github.com/polymorph-components/polymorph-test?rev=b4026866e481ead0738742e3b380601b605e5350#b4026866e481ead0738742e3b380601b605e5350"
 dependencies = [
  "component-test-core",
  "component-test-sdk-macro",
@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "component-test-sdk-macro"
 version = "0.1.0"
-source = "git+https://github.com/polymorph-components/polymorph-test?rev=2436bb9fd233ec514f10de613556a7a61bbb8476#2436bb9fd233ec514f10de613556a7a61bbb8476"
+source = "git+https://github.com/polymorph-components/polymorph-test?rev=b4026866e481ead0738742e3b380601b605e5350#b4026866e481ead0738742e3b380601b605e5350"
 dependencies = [
  "component-test-core",
  "proc-macro2",

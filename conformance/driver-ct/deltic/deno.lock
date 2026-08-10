@@ -62,5 +62,12 @@
     "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/wasi-shims/src/io.ts": "dfe270e5ad3388c02696e27a5c69c58a411759fe8c99416361b0ac10177366da",
     "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/wasi-shims/src/mod.ts": "1748985cf851252e1755aafd9ebb9c7ae96003ec41322d9524a952062d2b8570",
     "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/wasi-shims/src/random.ts": "dc04d20de5399cc7fa8685a04ec954618e3994a374ef94535fff408a745425e2"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:playwright-core@1.62.1"
+      ]
+    }
   }
 }

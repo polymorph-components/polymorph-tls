@@ -49,6 +49,7 @@ _ct-tools:
     fi
     {{ct}} pins --cargo-lock Cargo.lock \
         --js-lock conformance/driver-ct/jco/package-lock.json \
+        --js-lock conformance/driver-ct/deltic/package-lock.json \
         --expect "$rev" > /dev/null
 
 # Check the committed case inventory against the built suite.
@@ -151,6 +152,43 @@ run-deltic-delegated: build
         --suite suite-delegated \
         --target deltic-deno-delegated --translator "$translator"
 
+# The deltic browser driver's npm tree (the upstream page driver +
+# playwright-core; no transpiler).
+_deltic-browser-prepared: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/deltic
+    if [ package-lock.json -nt node_modules/.package-lock.json ]; then
+        npm ci --no-audit --no-fund
+    fi
+
+# Both composed artifacts runtime-linked inside headless Chromium: the
+# upstream deltic worker loads the pinned embedder bundle and links the
+# suite in the browser — no transpile step, no generated tree.
+run-deltic-browser: _deltic-browser-prepared
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/deltic
+    deno run --allow-read=. --allow-write=../../../target/deltic \
+        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
+        fetch-translator.ts --asset translator >/dev/null
+    deno run --allow-read=. --allow-write=../../../target/deltic \
+        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
+        fetch-translator.ts --asset embedder >/dev/null
+    node run-browser.mjs
+
+# Runs the deltic browser leg under CI or CONFORMANCE_BROWSER=1;
+# otherwise clears stale results so the standing run is deterministic.
+_run-deltic-browser-if-enabled:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CONFORMANCE_BROWSER:-}" = "1" ]; then
+        cd {{root}} && just conformance-ct::run-deltic-browser
+    else
+        cd {{root}}
+        rm -f {{results}}/deltic-browser.jsonl {{results}}/deltic-browser-delegated.jsonl
+    fi
+
 # The on-demand third target: the `tls-delegated` world over the
 # webcrypto-signer shim and a real polymorph:webcrypto provider, cloned
 # and built at the rev pinned alongside the shim's vendored WIT.
@@ -191,6 +229,8 @@ aggregate: _ct-tools
     [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra+=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
     [ -f {{results}}/jco-browser.jsonl ] && extra+=(--results jco-browser={{results}}/jco-browser.jsonl)
     [ -f {{results}}/jco-browser-delegated.jsonl ] && extra+=(--results jco-browser-delegated={{results}}/jco-browser-delegated.jsonl)
+    [ -f {{results}}/deltic-browser.jsonl ] && extra+=(--results deltic-browser={{results}}/deltic-browser.jsonl)
+    [ -f {{results}}/deltic-browser-delegated.jsonl ] && extra+=(--results deltic-browser-delegated={{results}}/deltic-browser-delegated.jsonl)
     {{ct}} aggregate \
         --lock conformance/guest-ct/tests.lock \
         --manifest conformance/driver-ct/targets.toml \
@@ -227,7 +267,7 @@ _run-browser-if-enabled:
 # The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated run-deltic run-deltic-delegated _run-browser-if-enabled _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated run-deltic run-deltic-delegated _run-browser-if-enabled _run-deltic-browser-if-enabled _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl
