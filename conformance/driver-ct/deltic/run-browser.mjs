@@ -5,8 +5,8 @@
 // pinned deltic-embedder.mjs release asset and links the suite in the
 // browser: no transpile step, no generated tree. This file is the frame:
 // asset URL wiring, target configuration, and results-file writing —
-// the browser sibling of ../deltic/run.ts exactly as ../jco/run-browser.mjs
-// is the browser sibling of ../jco/run-node.mjs.
+// the browser sibling of ../deltic/run.ts (as the retired jco
+// run-browser.mjs was of its run-node.mjs; see git history).
 //
 // The artifacts import only wasi 0.2 and test-context, so there is no
 // SUT host module on this leg and the stock upstream worker serves it

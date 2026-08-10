@@ -1,7 +1,8 @@
 // The deltic leg of the conformance harness: runs a composed artifact
 // (the shared suite fused with one TLS delivery) runtime-linked under
 // deltic on stock Deno, and writes component-test results JSONL for the
-// aggregate — the deltic analogue of ../jco/run-node.mjs, mirroring its
+// aggregate — the deltic analogue of the retired jco run-node.mjs
+// (removed with the jco legs; see git history), mirroring its
 // frame exactly:
 //
 //   run-node.mjs                          | this runner

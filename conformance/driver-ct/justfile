@@ -48,7 +48,6 @@ _ct-tools:
         printf '%s' "$rev" > target/ct-tools/.rev
     fi
     {{ct}} pins --cargo-lock Cargo.lock \
-        --js-lock conformance/driver-ct/jco/package-lock.json \
         --js-lock conformance/driver-ct/deltic/package-lock.json \
         --expect "$rev" > /dev/null
 
@@ -86,43 +85,6 @@ run-delegated: build _ct-tools
     {{ct-runner}} target/conformance/suite-delegated.wasm \
         --suite-artifact {{guest}} \
         --target composed-delegated --jsonl > {{results}}/composed-delegated.jsonl
-
-# Transpile both composed artifacts for the Node legs. The stamp covers
-# the artifacts and the package.json: the transpile flags and the
-# pinned transpiler live there, and either changing must invalidate the
-# generated tree.
-_jco-prepared: build
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd {{root}}/conformance/driver-ct/jco
-    if [ package-lock.json -nt node_modules/.package-lock.json ]; then
-        npm ci --no-audit --no-fund
-    fi
-    stamp=$(cat ../../../target/conformance/suite-plain.wasm \
-        ../../../target/conformance/suite-delegated.wasm \
-        package.json | sha256sum | cut -d' ' -f1)
-    if [ "$(cat generated/.stamp 2>/dev/null || true)" != "$stamp" ]; then
-        npm run --silent transpile
-        npm run --silent transpile:delegated
-        printf '%s' "$stamp" > generated/.stamp
-    fi
-
-# The suite over the in-guest Ed25519 posture, under Node 24 JSPI.
-run-jco-node: _jco-prepared
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd {{root}}/conformance/driver-ct/jco
-    node --experimental-wasm-jspi run-node.mjs --suite suite-plain \
-        --missing delegated-signer --target jco-node
-
-# The suite over the delegated build with the fixture signer, under
-# Node 24 JSPI.
-run-jco-node-delegated: _jco-prepared
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd {{root}}/conformance/driver-ct/jco
-    node --experimental-wasm-jspi run-node.mjs --suite suite-delegated \
-        --target jco-node-delegated
 
 # The composed artifact runtime-linked under deltic on stock Deno —
 # no transpile step, no generated tree, no engine flag (callback ABI).
@@ -227,8 +189,6 @@ aggregate: _ct-tools
     cd {{root}}
     extra=()
     [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra+=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
-    [ -f {{results}}/jco-browser.jsonl ] && extra+=(--results jco-browser={{results}}/jco-browser.jsonl)
-    [ -f {{results}}/jco-browser-delegated.jsonl ] && extra+=(--results jco-browser-delegated={{results}}/jco-browser-delegated.jsonl)
     [ -f {{results}}/deltic-browser.jsonl ] && extra+=(--results deltic-browser={{results}}/deltic-browser.jsonl)
     [ -f {{results}}/deltic-browser-delegated.jsonl ] && extra+=(--results deltic-browser-delegated={{results}}/deltic-browser-delegated.jsonl)
     {{ct}} aggregate \
@@ -236,38 +196,15 @@ aggregate: _ct-tools
         --manifest conformance/driver-ct/targets.toml \
         --results composed={{results}}/composed.jsonl \
         --results composed-delegated={{results}}/composed-delegated.jsonl \
-        --results jco-node={{results}}/jco-node.jsonl \
-        --results jco-node-delegated={{results}}/jco-node-delegated.jsonl \
         --results deltic-deno={{results}}/deltic-deno.jsonl \
         --results deltic-deno-delegated={{results}}/deltic-deno-delegated.jsonl \
         ${extra[@]+"${extra[@]}"} \
         -o {{results}}/matrix.md
 
-# The browser targets: both composed artifacts inside headless
-# Chromium via the upstream page driver. Gates in CI; locally opt-in.
-run-browser: _jco-prepared
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd {{root}}/conformance/driver-ct/jco
-    node run-browser.mjs
-
-# Runs the browser leg under CI or CONFORMANCE_BROWSER=1; otherwise
-# clears stale browser results so the standing run is deterministic.
-_run-browser-if-enabled:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CONFORMANCE_BROWSER:-}" = "1" ]; then
-        cd {{root}} && just conformance-ct::run-browser
-    else
-        cd {{root}}
-        rm -f {{results}}/jco-browser.jsonl {{results}}/jco-browser-delegated.jsonl
-        echo "browser leg skipped (set CONFORMANCE_BROWSER=1, needs Chrome/Chromium)"
-    fi
-
 # The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated run-jco-node run-jco-node-delegated run-deltic run-deltic-delegated _run-browser-if-enabled _run-deltic-browser-if-enabled _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-deltic run-deltic-delegated _run-deltic-browser-if-enabled _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl

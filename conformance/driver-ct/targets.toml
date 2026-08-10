@@ -2,16 +2,14 @@
 # A target is a composition of the shared suite with one delivery of
 # the algorithm profile: the wasmtime rows run under the generic
 # component-test host runner (the composed artifact imports only wasi
-# and test-context), and the jco-node rows run the same artifacts
-# transpiled, under Node 24 JSPI (driver-ct/jco/run-node.mjs; the
-# transpiler is the lann/jco all-fixes pre-release pinned in
-# driver-ct/jco/package.json).
+# and test-context), and the deltic rows runtime-link the same
+# artifacts under the release-pinned deltic runtime — on stock Deno
+# (driver-ct/deltic/run.ts) and inside headless Chromium
+# (driver-ct/deltic/run-browser.mjs).
 #
-# The jco-browser rows run the same transpiles inside headless
-# Chromium via the upstream page driver (driver-ct/jco/run-browser.mjs).
-# They gate in CI (the Actions image ships Chrome); locally they run
-# under CONFORMANCE_BROWSER=1, so both are declared optional — a
-# missing results file is a warning, not an error.
+# The browser rows gate in CI (the Actions image ships Chrome);
+# locally they run under CONFORMANCE_BROWSER=1, so they are declared
+# optional — a missing results file is a warning, not an error.
 version = "0.1"
 
 # The target's TLS stack has a composed `polymorph:tls/signer`, so
@@ -28,14 +26,6 @@ missing-features = ["delegated-signer"]
 # The suite plugged with the `tls-delegated` world build carrying the
 # fixture signer (examples/test-signer, Ed25519).
 [targets.composed-delegated]
-missing-features = []
-
-# The composed artifact, transpiled and run under Node 24 JSPI.
-[targets.jco-node]
-missing-features = ["delegated-signer"]
-
-# The composed-delegated artifact under Node 24 JSPI.
-[targets.jco-node-delegated]
 missing-features = []
 
 # The composed artifact runtime-linked under deltic on stock Deno
@@ -55,16 +45,6 @@ missing-features = []
 # (`just conformance-ct::run-webcrypto`) and absent from CI runs and
 # the committed matrix.
 [targets.composed-delegated-webcrypto]
-missing-features = []
-optional = true
-
-# The composed artifact inside headless Chromium.
-[targets.jco-browser]
-missing-features = ["delegated-signer"]
-optional = true
-
-# The composed-delegated artifact inside headless Chromium.
-[targets.jco-browser-delegated]
 missing-features = []
 optional = true
 

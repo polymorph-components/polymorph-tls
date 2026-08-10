@@ -12,13 +12,13 @@ guest-ct/       the suite: cases on the polymorph:test contract, the
                 polymorph:tls surface imported as a consumer would;
                 tests.lock is the committed case inventory
 driver-ct/      target manifest (targets.toml), the recipes
-                (justfile, module `conformance-ct`), the jco-node
-                driver (jco/), the committed matrix (matrix.md);
+                (justfile, module `conformance-ct`), the deltic
+                drivers (deltic/), the committed matrix (matrix.md);
                 results/ is generated
 ```
 
 `just conformance` (from the repository root) runs the standing
-matrix: build, inventory check, the wasmtime and Node targets under
+matrix: build, inventory check, the wasmtime and deltic targets under
 the pinned tooling, aggregate, and the committed-matrix diff.
 
 ## Targets
@@ -26,22 +26,18 @@ the pinned tooling, aggregate, and the committed-matrix diff.
 A target is a composition, not a runtime configuration: the suite is
 `wac plug`-ged with one TLS stack, and the resulting artifact imports
 only wasi and `polymorph:test/test-context`. The wasmtime rows run
-under the generic component-test host runner; the jco rows transpile
-the same artifacts (`-I async`, the lann/jco all-fixes pre-release
-pinned in `driver-ct/jco/package.json`) and run them under Node 24
-JSPI — one suite, one composition, two engines.
+under the generic component-test host runner; the deltic rows
+runtime-link the same artifacts under the release-pinned deltic
+runtime (`driver-ct/deltic/`) — one suite, one composition, two
+engines.
 
 | Target | Composition |
 | --- | --- |
 | `composed` | the `tls` world build: in-guest Ed25519 signing only |
 | `composed-delegated` | the `tls-delegated` world build ⊕ the fixture signer (`examples/test-signer`) |
 | `composed-delegated-webcrypto` | as above, but the signer is the `examples/webcrypto-signer` shim over a real `polymorph:webcrypto` provider; on demand (`just conformance-ct::run-webcrypto`), declared `optional` |
-| `jco-node` | the `composed` artifact, transpiled, under Node 24 JSPI |
-| `jco-node-delegated` | the `composed-delegated` artifact, likewise |
 | `deltic-deno` | the `composed` artifact runtime-linked under deltic on stock Deno (no transpile, no engine flag) |
 | `deltic-deno-delegated` | the `composed-delegated` artifact, likewise |
-| `jco-browser` | the `composed` artifact inside headless Chromium (the upstream page driver; gates in CI, locally `CONFORMANCE_BROWSER=1`; declared `optional`) |
-| `jco-browser-delegated` | the `composed-delegated` artifact, likewise |
 | `deltic-browser` | the `composed` artifact runtime-linked inside headless Chromium (gates in CI, locally `CONFORMANCE_BROWSER=1`; declared `optional`) |
 | `deltic-browser-delegated` | the `composed-delegated` artifact, likewise |
 

@@ -4,9 +4,8 @@ The deltic leg of the conformance matrix: the composed artifacts
 (`suite-plain`, `suite-delegated`) run **runtime-linked** under
 [deltic](https://github.com/lann/deltic) on stock Deno — no transpile
 step, no generated tree, no `--experimental-wasm-jspi` (the WIT
-contract's async exports run on the callback ABI). The deltic analogue
-of `../jco/run-node.mjs`; targets `deltic-deno` and
-`deltic-deno-delegated` in `../targets.toml`.
+contract's async exports run on the callback ABI). Targets
+`deltic-deno` and `deltic-deno-delegated` in `../targets.toml`.
 
 There is no SUT host module on this leg (the TLS delivery is fused
 in-guest, the artifacts import only wasi 0.2 and test-context), so the
