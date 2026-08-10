@@ -42,6 +42,8 @@ JSPI — one suite, one composition, two engines.
 | `deltic-deno-delegated` | the `composed-delegated` artifact, likewise |
 | `jco-browser` | the `composed` artifact inside headless Chromium (the upstream page driver; gates in CI, locally `CONFORMANCE_BROWSER=1`; declared `optional`) |
 | `jco-browser-delegated` | the `composed-delegated` artifact, likewise |
+| `deltic-browser` | the `composed` artifact runtime-linked inside headless Chromium (gates in CI, locally `CONFORMANCE_BROWSER=1`; declared `optional`) |
+| `deltic-browser-delegated` | the `composed-delegated` artifact, likewise |
 
 In-suite QUIC cases are
 [#29](https://github.com/polymorph-components/polymorph-tls/issues/29).
