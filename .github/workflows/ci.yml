@@ -98,8 +98,15 @@ jobs:
         uses: polymorph-components/polymorph-test/actions/setup@b4026866e481ead0738742e3b380601b605e5350
         with:
           js-locks: |
+            conformance/driver-ct/jco/package-lock.json
             conformance/driver-ct/deltic/package-lock.json
-      - name: Set up Deno (the deltic-deno and deltic-browser legs; stock, no flags)
+      - name: Set up Node 24 (the jco-node legs; JSPI)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: conformance/driver-ct/jco/package-lock.json
+      - name: Set up Deno (the deltic-deno legs; stock, no flags)
         uses: denoland/setup-deno@v2
         with:
           deno-version: "2.9.5"
@@ -123,8 +130,12 @@ jobs:
           results: |
             composed=conformance/driver-ct/results/composed.jsonl
             composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
+            jco-node=conformance/driver-ct/results/jco-node.jsonl
+            jco-node-delegated=conformance/driver-ct/results/jco-node-delegated.jsonl
             deltic-deno=conformance/driver-ct/results/deltic-deno.jsonl
             deltic-deno-delegated=conformance/driver-ct/results/deltic-deno-delegated.jsonl
+            jco-browser=conformance/driver-ct/results/jco-browser.jsonl
+            jco-browser-delegated=conformance/driver-ct/results/jco-browser-delegated.jsonl
             deltic-browser=conformance/driver-ct/results/deltic-browser.jsonl
             deltic-browser-delegated=conformance/driver-ct/results/deltic-browser-delegated.jsonl
           summary-title: Conformance matrix
