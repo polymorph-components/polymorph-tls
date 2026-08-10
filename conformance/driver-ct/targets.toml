@@ -38,6 +38,16 @@ missing-features = ["delegated-signer"]
 [targets.jco-node-delegated]
 missing-features = []
 
+# The composed artifact runtime-linked under deltic on stock Deno
+# (driver-ct/deltic/run.ts): no transpile step, no engine flag — the
+# release-pinned runtime links the component at load time.
+[targets.deltic-deno]
+missing-features = ["delegated-signer"]
+
+# The composed-delegated artifact under deltic on stock Deno.
+[targets.deltic-deno-delegated]
+missing-features = []
+
 # As composed-delegated, but the signer is the webcrypto-signer shim
 # over a real polymorph:webcrypto provider (the sibling repository,
 # cloned and built at the rev pinned alongside the shim's vendored

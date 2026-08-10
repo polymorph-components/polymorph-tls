@@ -1,0 +1,12 @@
+{
+  "//": "The deltic release pin (TAG in fetch-translator.ts must match; its assertPinConsistency checks). @deltic/runtime/embedder is mapped because wasi-shims imports it by bare specifier internally.",
+  "imports": {
+    "@deltic/ct-runner": "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/ct-runner/src/mod.ts",
+    "@deltic/runtime/embedder": "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/runtime/src/embedder/mod.ts",
+    "@deltic/runtime/shim": "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/runtime/src/shim/mod.ts",
+    "@deltic/wasi-shims": "https://raw.githubusercontent.com/lann/deltic/pre-83fff30/wasi-shims/src/mod.ts"
+  },
+  "tasks": {
+    "check": "deno check run.ts fetch-translator.ts"
+  }
+}
