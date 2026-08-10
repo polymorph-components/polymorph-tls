@@ -136,6 +136,8 @@ jobs:
             composed-delegated=conformance/driver-ct/results/composed-delegated.jsonl
             jco-node=conformance/driver-ct/results/jco-node.jsonl
             jco-node-delegated=conformance/driver-ct/results/jco-node-delegated.jsonl
+            deltic-deno=conformance/driver-ct/results/deltic-deno.jsonl
+            deltic-deno-delegated=conformance/driver-ct/results/deltic-deno-delegated.jsonl
             jco-browser=conformance/driver-ct/results/jco-browser.jsonl
             jco-browser-delegated=conformance/driver-ct/results/jco-browser-delegated.jsonl
           summary-title: Conformance matrix
