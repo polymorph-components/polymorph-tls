@@ -1,7 +1,21 @@
-# Run all checks.
-check: fmt-check clippy test build-wasm
+# The orchestration surface: repo-wide recipes plus the GitHub Actions
+# gha module, colocated with the workflows it drives.
 
 mod conformance-ct "conformance/driver-ct/justfile"
+# GitHub Actions plumbing: CI job entry points and workflow-only recipes.
+mod gha ".github"
+
+# List the available recipes.
+default:
+    @just --list
+
+# The exact set of checks CI runs: each CI job runs exactly one gha:: job
+# recipe. The timing lab is schedule-only (timing-lab.yml) and not part
+# of ci.
+ci: (gha::rust-checks) (gha::smoke) (gha::conformance-checks) (gha::interop)
+
+# The fast pre-commit checks.
+check: fmt-check clippy test build-wasm
 
 fmt:
     cargo fmt --all
@@ -83,49 +97,3 @@ timing-lab:
     [ -n "${TIMING_LAB_SEED:-}" ] && args+=(--env TIMING_LAB_SEED)
     [ -n "${TIMING_LAB_ISOLATE:-}" ] && args+=(--env TIMING_LAB_ISOLATE)
     wasmtime run "${args[@]}" target/wasm32-wasip2/release/timing-lab.wasm
-
-# The timing lab's scheduled wrapper: one retry at 4x samples before
-# reporting failure — a flake washes out at 4x while a real leak's t grows,
-# so the retry separates them; shared runners make the retry mandatory
-# rather than optional. Records the environment the verdicts are valid for
-# (verdicts hold per runtime version and per microarchitecture; a wasmtime
-# upgrade or a runner change invalidates previous quiet readings). Under
-# GitHub Actions the report also lands in the job summary.
-timing-lab-scheduled:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    samples="${TIMING_LAB_SAMPLES:-2000}"
-    cpu=$(sed -n 's/^model name[^:]*: //p' /proc/cpuinfo | head -n1)
-    [ -n "$cpu" ] || cpu="$(sed -n 's/^CPU implementer[^:]*: /implementer /p' /proc/cpuinfo | head -n1)"
-    environment="$(wasmtime --version), $(uname -m), ${cpu:-unknown CPU}"
-    echo "timing lab environment: ${environment}"
-    run() { TIMING_LAB_SAMPLES="$1" just timing-lab 2>&1; }
-
-    report=$(run "$samples"); status=$?
-    printf '%s\n' "$report"
-    if [ $status -ne 0 ]; then
-        samples=$(( samples * 4 ))
-        echo
-        echo "timing lab: verdicts diverged; retrying at ${samples} samples/class before reporting failure."
-        report=$(run "$samples"); status=$?
-        printf '%s\n' "$report"
-    fi
-
-    if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-        {
-            echo "### timing lab — ${samples} samples/class"
-            echo
-            echo "Environment: ${environment}"
-            echo
-            # The lab prints its report as a markdown table; lift it verbatim.
-            printf '%s\n' "$report" | sed -n '/^| surface/,/^$/p'
-            if [ $status -eq 0 ]; then
-                echo "All surfaces matched expectations."
-            else
-                echo "**Surfaces diverged from expectation, and again on a retry at ${samples} samples/class.**"
-                echo "A quiet positive control means the harness cannot detect leaks at this"
-                echo "measurement distance; a LEAK on a real surface warrants investigation."
-            fi
-        } >> "$GITHUB_STEP_SUMMARY"
-    fi
-    exit $status
