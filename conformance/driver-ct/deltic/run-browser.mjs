@@ -15,9 +15,10 @@
 // Gates in CI (the Actions runner image ships Chrome); locally it runs
 // under CONFORMANCE_BROWSER=1 (`just conformance-ct::all`) or directly
 // via `just conformance-ct::run-deltic-browser`. The justfile recipe
-// fetches the sha256-pinned release assets first (fetch-translator.ts
-// --asset translator|embedder), cached under target/deltic/<tag>/ and
-// served to the page from the repository-root server.
+// builds the two browser assets first (deno bundle for the embedder,
+// deno info + copy for the translator wasm — both from the SAME pinned
+// JSR graph as the Deno legs; see README.md's "Pinning" section), served to the
+// page from the repository-root server.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -32,10 +33,10 @@ import { writeResultsFile } from "@polymorph/component-test-js/node-runner";
 
 const DELTIC_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(DELTIC_DIR, "..", "..", "..");
-// Must agree with fetch-translator.ts's TAG (assets are served from its
-// cache directory).
-const TAG = "pre-83fff30";
-const ASSETS = `/target/deltic/${TAG}`;
+// Version-free: the lock (not a path segment) owns the deltic version now
+// (see README.md's "Pinning" section). Built by the justfile's
+// browser-asset recipes before this script runs.
+const ASSETS = `/target/deltic-browser`;
 const CASE_TIMEOUT_MS = 60_000;
 const STALL_TIMEOUT_MS = 90_000;
 

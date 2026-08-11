@@ -27,7 +27,7 @@ A target is a composition, not a runtime configuration: the suite is
 `wac plug`-ged with one TLS stack, and the resulting artifact imports
 only wasi and `polymorph:test/test-context`. The wasmtime rows run
 under the generic component-test host runner; the deltic rows
-runtime-link the same artifacts under the release-pinned deltic
+runtime-link the same artifacts under the JSR-pinned deltic
 runtime (`driver-ct/deltic/`) — one suite, one composition, two
 engines.
 
