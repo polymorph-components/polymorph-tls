@@ -86,33 +86,42 @@ run-delegated: build _ct-tools
         --suite-artifact {{guest}} \
         --target composed-delegated --jsonl > {{results}}/composed-delegated.jsonl
 
+# The one-version-everywhere gate: every jsr:@deltic/* import across
+# every deno.json in the repo must pin the same version (replaces the
+# retired fetch-based translator script's pin-consistency check). Runs
+# at the top of every deltic recipe below so drift fails loud immediately.
+_deltic-pin-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    files=$(find . -name deno.json -not -path '*/node_modules/*')
+    v=$(grep -ho 'jsr:@deltic/[a-z-]*@[^/"]*' $files | sed 's/.*@//' | sort -u)
+    n=$(printf '%s\n' "$v" | sed '/^$/d' | wc -l)
+    [ "$n" = 1 ] || { echo "deltic pin drift: $v" >&2; exit 1; }
+
 # The composed artifact runtime-linked under deltic on stock Deno —
 # no transpile step, no generated tree, no engine flag (callback ABI).
 # The pin and the module-graph lock live in deltic/ (see its README).
-run-deltic: build
+# The translator is the packaged @deltic/translator asset, resolved
+# through the module graph (no net grant, no fetched-asset read grant).
+run-deltic: _deltic-pin-check build
     #!/usr/bin/env bash
     set -euo pipefail
     cd {{root}}/conformance/driver-ct/deltic
-    translator=$(deno run --allow-read=. --allow-write=../../../target/deltic \
-        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
-        fetch-translator.ts)
-    deno run --allow-read=../../..,"$translator" --allow-write=../results \
+    deno run --allow-read=../../.. --allow-write=../results \
         --config deno.json --frozen run.ts \
         --suite suite-plain --missing delegated-signer \
-        --target deltic-deno --translator "$translator"
+        --target deltic-deno
 
 # The composed-delegated artifact under deltic on stock Deno.
-run-deltic-delegated: build
+run-deltic-delegated: _deltic-pin-check build
     #!/usr/bin/env bash
     set -euo pipefail
     cd {{root}}/conformance/driver-ct/deltic
-    translator=$(deno run --allow-read=. --allow-write=../../../target/deltic \
-        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
-        fetch-translator.ts)
-    deno run --allow-read=../../..,"$translator" --allow-write=../results \
+    deno run --allow-read=../../.. --allow-write=../results \
         --config deno.json --frozen run.ts \
         --suite suite-delegated \
-        --target deltic-deno-delegated --translator "$translator"
+        --target deltic-deno-delegated
 
 # The deltic browser driver's npm tree (the upstream page driver +
 # playwright-core; no transpiler).
@@ -124,19 +133,31 @@ _deltic-browser-prepared: build
         npm ci --no-audit --no-fund
     fi
 
-# Both composed artifacts runtime-linked inside headless Chromium: the
-# upstream deltic worker loads the pinned embedder bundle and links the
-# suite in the browser — no transpile step, no generated tree.
-run-deltic-browser: _deltic-browser-prepared
+# The two repo-built browser assets, from the SAME pinned JSR graph as
+# the Deno legs (no sha256 bookkeeping — the lock owns integrity).
+# Version-free output dir: the lock (not a path segment) owns the
+# deltic version now (see deltic/README.md, "Pinning").
+_deltic-browser-build: _deltic-pin-check _deltic-browser-prepared
     #!/usr/bin/env bash
     set -euo pipefail
     cd {{root}}/conformance/driver-ct/deltic
-    deno run --allow-read=. --allow-write=../../../target/deltic \
-        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
-        fetch-translator.ts --asset translator >/dev/null
-    deno run --allow-read=. --allow-write=../../../target/deltic \
-        --allow-net=github.com,objects.githubusercontent.com,release-assets.githubusercontent.com \
-        fetch-translator.ts --asset embedder >/dev/null
+    out=../../../target/deltic-browser
+    mkdir -p "$out"
+    deno bundle --config deno.json --frozen --platform browser \
+        -o "$out/deltic-embedder.mjs" browser-bundle-entry.ts
+    info=$(mktemp)
+    trap 'rm -f "$info"' EXIT
+    deno info --json --config deno.json --frozen @deltic/translator > "$info"
+    pin=$(grep -o 'jsr:@deltic/runtime@[^/"]*' deno.json | head -1 | sed 's/.*@//')
+    python3 extract-translator-wasm.py "$info" "$out/deltic-translator-shim.wasm" "$pin"
+
+# Both composed artifacts runtime-linked inside headless Chromium: the
+# upstream deltic worker loads the repo-built embedder bundle and links
+# the suite in the browser — no transpile step, no generated tree.
+run-deltic-browser: _deltic-browser-build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}/conformance/driver-ct/deltic
     node run-browser.mjs
 
 # Runs the deltic browser leg under CI or CONFORMANCE_BROWSER=1;

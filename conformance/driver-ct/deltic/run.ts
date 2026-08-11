@@ -24,13 +24,17 @@
 //
 //   deno run --allow-read=../../.. --allow-write=../results \
 //     --config deno.json --frozen run.ts --suite suite-plain \
-//     --missing delegated-signer --target deltic-deno \
-//     --translator <shim.wasm>
+//     --missing delegated-signer --target deltic-deno
+//
+// The translator is the packaged @deltic/translator asset, loaded
+// through the module graph (no net grant, no read grant for a fetched
+// wasm) — see README.md's "Pinning" section.
 
 import { Translator } from "@deltic/runtime/shim";
 import type { ComponentArtifacts } from "@deltic/runtime/embedder";
 import { runSuite } from "@deltic/ct-runner";
 import { wasiShims } from "@deltic/wasi-shims";
+import { defaultTranslator } from "@deltic/translator";
 
 const ROOT = new URL("../../../", import.meta.url);
 const RESULTS = new URL("../results/", import.meta.url);
@@ -57,7 +61,11 @@ interface Cli {
   target: string;
   suiteName: string;
   missing: string[];
-  translator: string;
+  // Optional: an explicit translator shim wasm path, for callers that
+  // source their own build (e.g. a local dev override). Defaults to the
+  // packaged @deltic/translator asset (defaultTranslator()); see
+  // README.md's "Pinning" section.
+  translator?: string;
 }
 
 function parseCli(argv: string[]): Cli {
@@ -89,10 +97,10 @@ function parseCli(argv: string[]): Cli {
         throw new Error(`unknown argument ${argv[i]}`);
     }
   }
-  if (!suite || !target || !translator) {
+  if (!suite || !target) {
     console.error(
       "usage: run.ts --suite <suite-plain|suite-delegated> --target <key> " +
-        "--translator <shim.wasm> [--missing f1,f2] [--suite-name name]",
+        "[--missing f1,f2] [--suite-name name] [--translator <shim.wasm>]",
     );
     Deno.exit(2);
   }
@@ -104,9 +112,9 @@ async function main() {
   const componentBytes = await Deno.readFile(
     new URL(`target/conformance/${cli.suite}.wasm`, ROOT),
   );
-  const translator = await Translator.create(
-    await Deno.readFile(cli.translator),
-  );
+  const translator = cli.translator
+    ? await Translator.create(await Deno.readFile(cli.translator))
+    : await defaultTranslator();
   const { plan, adapters } = translator.translate(componentBytes);
   const artifacts: ComponentArtifacts = { plan, componentBytes, adapters };
 

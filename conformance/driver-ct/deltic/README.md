@@ -26,11 +26,17 @@ target here.
 
 ## Pinning
 
-deltic is pinned to a release tag in `deno.json` (import-map URLs;
-`deno.lock` carries the module-graph integrity, enforced with
-`--frozen`) and `fetch-translator.ts` (TAG + sha256 for the
-`deltic-translator-shim.wasm` release asset, cached under
-`target/deltic/<tag>/`), cross-checked at run time. To bump: update the
-tag in both files and the sha from the release's `SHA256SUMS`, delete
-`deno.lock`, re-run `deno cache run.ts fetch-translator.ts` here, and
-commit the diff.
+deltic is pinned to an exact JSR prerelease (`0.1.0-pre.ga67ee83`; the
+hash names one upstream commit) via `deno.json`'s import-map (`deno.lock`
+carries module-graph integrity, enforced with `--frozen`). The browser
+leg's embedder bundle and translator wasm are built from that SAME
+pinned graph (`../justfile`'s `_deltic-browser-build` recipe: `deno
+bundle` for the embedder, `deno info` + copy for the translator wasm) —
+no sha256 bookkeeping, no GitHub release-asset fetch. A repo-wide pin
+gate (`../justfile`'s `_deltic-pin-check`) asserts every `deno.json` in
+the repo agrees on one `@deltic` version.
+
+To bump: update the version in this directory's `deno.json` import-map
+entries, delete `deno.lock`, run `deno install --config deno.json
+--entrypoint run.ts browser-bundle-entry.ts` here, and commit the diff
+(the pin gate asserts agreement).

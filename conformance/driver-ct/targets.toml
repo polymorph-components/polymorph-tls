@@ -3,7 +3,7 @@
 # the algorithm profile: the wasmtime rows run under the generic
 # component-test host runner (the composed artifact imports only wasi
 # and test-context), and the deltic rows runtime-link the same
-# artifacts under the release-pinned deltic runtime — on stock Deno
+# artifacts under the JSR-pinned deltic runtime — on stock Deno
 # (driver-ct/deltic/run.ts) and inside headless Chromium
 # (driver-ct/deltic/run-browser.mjs).
 #
