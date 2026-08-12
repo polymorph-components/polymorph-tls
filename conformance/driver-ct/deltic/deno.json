@@ -1,11 +1,11 @@
 {
-  "//": "The deltic pin: every @deltic/* import is an exact-pinned JSR prerelease (0.1.0-pre.ga67ee83); the hash names one upstream commit and @deltic/translator ships the translator wasm for that SAME commit. deno.lock carries integrity, --frozen enforced. One version repo-wide is asserted by the pin gate (../justfile).",
+  "//": "The deltic pin: every @deltic/* import is an exact-pinned JSR prerelease (0.1.0-pre.g078aa15); the hash names one upstream commit and @deltic/translator ships the translator wasm for that SAME commit. deno.lock carries integrity, --frozen enforced. One version repo-wide is asserted by the pin gate (../justfile).",
   "imports": {
-    "@deltic/ct-runner": "jsr:@deltic/ct-runner@0.1.0-pre.ga67ee83",
-    "@deltic/runtime/embedder": "jsr:@deltic/runtime@0.1.0-pre.ga67ee83/embedder",
-    "@deltic/runtime/shim": "jsr:@deltic/runtime@0.1.0-pre.ga67ee83/shim",
-    "@deltic/wasi-shims": "jsr:@deltic/wasi-shims@0.1.0-pre.ga67ee83",
-    "@deltic/translator": "jsr:@deltic/translator@0.1.0-pre.ga67ee83"
+    "@deltic/ct-runner": "jsr:@deltic/ct-runner@0.1.0-pre.g078aa15",
+    "@deltic/runtime/embedder": "jsr:@deltic/runtime@0.1.0-pre.g078aa15/embedder",
+    "@deltic/runtime/shim": "jsr:@deltic/runtime@0.1.0-pre.g078aa15/shim",
+    "@deltic/wasi-shims": "jsr:@deltic/wasi-shims@0.1.0-pre.g078aa15",
+    "@deltic/translator": "jsr:@deltic/translator@0.1.0-pre.g078aa15"
   },
   "minimumDependencyAge": { "age": "P1D", "exclude": ["jsr:@deltic/*"] },
   "tasks": {

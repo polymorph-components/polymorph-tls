@@ -26,7 +26,7 @@ target here.
 
 ## Pinning
 
-deltic is pinned to an exact JSR prerelease (`0.1.0-pre.ga67ee83`; the
+deltic is pinned to an exact JSR prerelease (`0.1.0-pre.g078aa15`; the
 hash names one upstream commit) via `deno.json`'s import-map (`deno.lock`
 carries module-graph integrity, enforced with `--frozen`). The browser
 leg's embedder bundle and translator wasm are built from that SAME
