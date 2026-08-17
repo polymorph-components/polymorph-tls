@@ -19,6 +19,14 @@ measured in [`bench/`](bench/README.md). Upstreaming and the tls-virt
 follow-ons remain — see the
 [issue tracker](https://github.com/polymorph-components/polymorph-tls/issues).
 
+## Releases
+
+Everything here is **unstable** (0.x), but [releases](../../releases) are
+**caret-honest**: within a minor line they stay backward-compatible, and
+anything breaking bumps the minor. Consumption is pinned at a release's
+commit — cargo git dependencies, vendored WIT, the release-pinned
+deltic/JSR graph — and bumped deliberately.
+
 ## Why pure-wasm TLS 1.3 is plausible
 
 Whether an algorithm is safe to run in wasm is a timing-channel question.

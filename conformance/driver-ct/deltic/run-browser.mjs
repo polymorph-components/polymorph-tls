@@ -10,7 +10,7 @@
 //
 // The artifacts import only wasi 0.2 and test-context, so there is no
 // SUT host module on this leg and the stock upstream worker serves it
-// unmodified (wasiShims + test-context are inside the bundle).
+// unmodified (wasi() + test-context are inside the bundle).
 //
 // Gates in CI (the Actions runner image ships Chrome); locally it runs
 // under CONFORMANCE_BROWSER=1 (`just conformance-ct::all`) or directly
