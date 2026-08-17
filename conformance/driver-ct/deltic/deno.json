@@ -7,7 +7,7 @@
     "@deltic/wasi": "jsr:@deltic/wasi@0.1.0",
     "@deltic/translator": "jsr:@deltic/translator@0.1.0"
   },
-  "minimumDependencyAge": { "age": "P1D", "exclude": ["jsr:@deltic/*"] },
+  "minimumDependencyAge": { "age": "P1D", "exclude": ["jsr:@deltic/*", "jsr:@polymorph/*"] },
   "tasks": {
     "check": "deno check run.ts browser-bundle-entry.ts"
   }

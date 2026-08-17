@@ -7,6 +7,7 @@
     "jsr:@deltic/runtime@0.1.0": "0.1.0",
     "jsr:@deltic/translator@0.1.0": "0.1.0",
     "jsr:@deltic/wasi@0.1.0": "0.1.0",
+    "npm:@jsr/polymorph__test@0.1.1": "0.1.1",
     "npm:playwright-core@1.62.1": "1.62.1"
   },
   "jsr": {
@@ -40,6 +41,10 @@
     }
   },
   "npm": {
+    "@jsr/polymorph__test@0.1.1": {
+      "integrity": "sha512-bu0jE52btthChm83f04rQo+twOLszJ/JN7nLGl/5W/66cZb8tQrlZG+Lnd4/XierTlBgy0PpW75bjbqQBY2nDg==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/polymorph__test/0.1.1.tgz"
+    },
     "playwright-core@1.62.1": {
       "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
       "bin": true
@@ -54,6 +59,7 @@
     ],
     "packageJson": {
       "dependencies": [
+        "npm:@jsr/polymorph__test@0.1.1",
         "npm:playwright-core@1.62.1"
       ]
     }
