@@ -95,7 +95,7 @@ jobs:
         # Owns the rev derivation, the rev-keyed tools cache, the
         # install, and the pins gate; `just conformance`'s _ct-tools
         # recognizes the stamped install and does not repeat it.
-        uses: polymorph-components/polymorph-test/actions/setup@b4026866e481ead0738742e3b380601b605e5350
+        uses: polymorph-components/polymorph-test/actions/setup@b4444a25a22106ad4128549bdc9e579552e62210
         with:
           js-locks: |
             conformance/driver-ct/deltic/package-lock.json
@@ -122,7 +122,7 @@ jobs:
       - run: just gha::conformance-checks
       - name: Publish the conformance matrix
         if: always() && hashFiles('conformance/driver-ct/results/*.jsonl') != ''
-        uses: polymorph-components/polymorph-test/actions/aggregate@b4026866e481ead0738742e3b380601b605e5350
+        uses: polymorph-components/polymorph-test/actions/aggregate@b4444a25a22106ad4128549bdc9e579552e62210
         with:
           lock: conformance/guest-ct/tests.lock
           manifest: conformance/driver-ct/targets.toml

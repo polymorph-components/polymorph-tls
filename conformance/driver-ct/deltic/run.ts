@@ -8,7 +8,7 @@
 //   run-node.mjs                          | this runner
 //   --------------------------------------+---------------------------
 //   jco transpile + loadCoreModules       | translator.translate(bytes)
-//   bindImports (preview2-shim, both      | wasiShims() (track-keyed:
+//   bindImports (preview2-shim, both      | wasi() (track-keyed:
 //     wasi minor spellings bound)         |   one @0.2 provider serves
 //                                         |   every minor)
 //   inventoryLookup(coreBytes) + missing  | deltic reads the suite's own
@@ -33,7 +33,7 @@
 import { Translator } from "@deltic/runtime/shim";
 import type { ComponentArtifacts } from "@deltic/runtime/embedder";
 import { runSuite } from "@deltic/ct-runner";
-import { wasiShims } from "@deltic/wasi-shims";
+import { wasi } from "@deltic/wasi";
 import { defaultTranslator } from "@deltic/translator";
 
 const ROOT = new URL("../../../", import.meta.url);
@@ -120,7 +120,7 @@ async function main() {
 
   const lines: string[] = [];
   const counts = await runSuite(artifacts, {
-    imports: wasiShims(),
+    imports: wasi(),
     target: cli.target,
     suiteName: cli.suiteName,
     missing: cli.missing,
