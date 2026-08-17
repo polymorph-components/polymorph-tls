@@ -47,8 +47,10 @@ _ct-tools:
         cargo install --locked --root target/ct-tools --git "$url" --rev "$rev" component-test-cli component-test-runner
         printf '%s' "$rev" > target/ct-tools/.rev
     fi
+    # Cargo-side pin gate only: the JS runner core is version-pinned
+    # from JSR now (@jsr/polymorph__test), checked by its own gate
+    # (runner-js-pin-check below) rather than this rev-based check.
     {{ct}} pins --cargo-lock Cargo.lock \
-        --js-lock conformance/driver-ct/deltic/package-lock.json \
         --expect "$rev" > /dev/null
 
 # Check the committed case inventory against the built suite.
@@ -98,6 +100,27 @@ _deltic-pin-check:
     v=$(grep -ho 'jsr:@deltic/[a-z-]*@[^/"]*' $files | sed 's/.*@//' | sort -u)
     n=$(printf '%s\n' "$v" | sed '/^$/d' | wc -l)
     [ "$n" = 1 ] || { echo "deltic pin drift: $v" >&2; exit 1; }
+
+# The JS runner core's one-version gate: the deltic npm tree consuming
+# @jsr/polymorph__test (jsr:@polymorph/test through JSR's npm-compat
+# registry, per deltic/.npmrc) and deltic's own deno.lock (which also
+# tracks that package.json dependency) must agree on one resolved
+# version — a skewed bump runs the JS harness against a Rust runner
+# from a different polymorph-test release, a subtle contract-mismatch
+# generator.
+runner-js-pin-check:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{root}}
+    v=$({ jq -r '.packages["node_modules/@jsr/polymorph__test"].version' \
+        conformance/driver-ct/deltic/package-lock.json; \
+        jq -r '.npm | keys[]' conformance/driver-ct/deltic/deno.lock \
+        | grep '^@jsr/polymorph__test@' | sed 's/.*@//'; } | sort -u)
+    if [ "$v" = "null" ] || [ -z "$v" ] || [ "$(printf '%s\n' "$v" | wc -l)" != 1 ]; then
+        echo "runner-js pin drift: $v" >&2
+        exit 1
+    fi
+    echo "runner-js pin OK: @jsr/polymorph__test $v"
 
 # The composed artifact runtime-linked under deltic on stock Deno —
 # no transpile step, no generated tree, no engine flag (callback ABI).

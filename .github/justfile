@@ -43,6 +43,7 @@ smoke:
 # composed with each delivery, the aggregated matrix diffed against the
 # committed one.
 conformance-checks:
+    @just gha::_step conformance-ct::runner-js-pin-check
     @just gha::_step conformance-ct::all
     @just gha::_step conformance-ct::matrix-check
 

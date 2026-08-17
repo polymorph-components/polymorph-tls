@@ -1,7 +1,7 @@
 // The deltic-browser leg: both composed artifacts run runtime-linked
 // inside headless Chromium — the page, worker pool, stall watchdog, and
-// Chrome ladder all live in @polymorph/component-test-js, and the
-// upstream DELTIC worker (js/runner-deltic/browser-worker.mjs) loads the
+// Chrome ladder all live in @jsr/polymorph__test, and the
+// upstream DELTIC worker (runner-deltic/browser-worker.mjs) loads the
 // pinned deltic-embedder.mjs release asset and links the suite in the
 // browser: no transpile step, no generated tree. This file is the frame:
 // asset URL wiring, target configuration, and results-file writing —
@@ -28,8 +28,8 @@ import {
   findChrome,
   MOUNT,
   runPageHarness,
-} from "@polymorph/component-test-js/browser-driver";
-import { writeResultsFile } from "@polymorph/component-test-js/node-runner";
+} from "@jsr/polymorph__test/browser-driver";
+import { writeResultsFile } from "@jsr/polymorph__test/node-runner";
 
 const DELTIC_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(DELTIC_DIR, "..", "..", "..");
@@ -77,7 +77,7 @@ const outcome = await runPageHarness({
     title: "polymorph:tls conformance (deltic-browser)",
     config: {
       jobs: 1,
-      workerUrl: `${MOUNT}/js/runner-deltic/browser-worker.mjs`,
+      workerUrl: `${MOUNT}/runner-deltic/browser-worker.mjs`,
       suites: SUITES,
     },
   }),
