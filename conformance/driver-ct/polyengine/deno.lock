@@ -1,0 +1,67 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@polyengine/ct-runner@0.3.0": "0.3.0",
+    "jsr:@polyengine/protocol@0.1": "0.1.0",
+    "jsr:@polyengine/runtime@0.3": "0.3.0",
+    "jsr:@polyengine/runtime@0.3.0": "0.3.0",
+    "jsr:@polyengine/translator@0.3.0": "0.3.0",
+    "jsr:@polyengine/wasi@0.3.0": "0.3.0",
+    "npm:@jsr/polymorph__test@0.2.0": "0.2.0",
+    "npm:playwright-core@1.62.1": "1.62.1"
+  },
+  "jsr": {
+    "@polyengine/ct-runner@0.3.0": {
+      "integrity": "d58720da80bf29cb6a975e4750a53bbe9b75ab6e3bde1340299ed69726702174",
+      "dependencies": [
+        "jsr:@polyengine/runtime@0.3"
+      ]
+    },
+    "@polyengine/protocol@0.1.0": {
+      "integrity": "0c97f34166f22ba55e7b084148df96e47aebe47cd9dd13930057759c9161bb1c"
+    },
+    "@polyengine/runtime@0.3.0": {
+      "integrity": "97d7648c104dd0f08b4d10e1ed0117ab0cb5243db68c139f1f3df25755ed4e60",
+      "dependencies": [
+        "jsr:@polyengine/protocol"
+      ]
+    },
+    "@polyengine/translator@0.3.0": {
+      "integrity": "1d9fcd09d360850bc08927ed1cf8124d50a0fed09ed8c80f354a6d3aedfcad25",
+      "dependencies": [
+        "jsr:@polyengine/runtime@0.3"
+      ]
+    },
+    "@polyengine/wasi@0.3.0": {
+      "integrity": "991adfdd39f795f94bba91a523322b88d45ff42800669b5b472356676e3c97e7",
+      "dependencies": [
+        "jsr:@polyengine/protocol",
+        "jsr:@polyengine/runtime@0.3"
+      ]
+    }
+  },
+  "npm": {
+    "@jsr/polymorph__test@0.2.0": {
+      "integrity": "sha512-fM1IYIy4HnBJm2IlZn/3Gk0d9AmQZz9Kg6JkY0E+fPAhFb2hrAW+4G7TCRQsJ4PStl0rzuBqF9VI6w30f7xCMA==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/polymorph__test/0.2.0.tgz"
+    },
+    "playwright-core@1.62.1": {
+      "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
+      "bin": true
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@polyengine/ct-runner@0.3.0",
+      "jsr:@polyengine/runtime@0.3.0",
+      "jsr:@polyengine/translator@0.3.0",
+      "jsr:@polyengine/wasi@0.3.0"
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:@jsr/polymorph__test@0.2.0",
+        "npm:playwright-core@1.62.1"
+      ]
+    }
+  }
+}

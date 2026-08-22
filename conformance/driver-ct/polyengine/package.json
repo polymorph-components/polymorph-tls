@@ -1,0 +1,10 @@
+{
+  "name": "@polymorph/tls-conformance-polyengine-browser",
+  "private": true,
+  "type": "module",
+  "description": "Node driver for the polyengine-browser conformance rows: the composed artifacts runtime-linked inside headless Chromium through the upstream page driver and polyengine worker.",
+  "dependencies": {
+    "@jsr/polymorph__test": "0.2.0",
+    "playwright-core": "1.62.1"
+  }
+}

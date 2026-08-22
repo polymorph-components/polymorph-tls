@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract the translator wasm from the lock-pinned @deltic/translator
+"""Extract the translator wasm from the lock-pinned @polyengine/translator
 module graph (`deno info --json`) into the browser-asset output dir.
 
 No network, no sha256 bookkeeping: JSR package integrity lives in
@@ -7,7 +7,7 @@ deno.lock; this only truncates the already-fetched, --frozen-verified
 cache entry down to its module bytes (Deno's on-disk remote-cache file
 carries a trailing "\n// denoCacheMetadata={...}" line after the wasm
 body — see the truncation + sanity checks below). See ../justfile's
-`_deltic-browser-build` recipe and README.md's "Pinning" section.
+`_polyengine-browser-build` recipe and README.md's "Pinning" section.
 
 Usage: extract-translator-wasm.py <deno-info.json> <out-wasm-path> <expected-version>
 """
@@ -18,7 +18,7 @@ import sys
 def main() -> int:
     info_path, out_path, expected_version = sys.argv[1], sys.argv[2], sys.argv[3]
     graph = json.load(open(info_path))
-    mods = [m for m in graph["modules"] if "/@deltic/" in m.get("specifier", "")]
+    mods = [m for m in graph["modules"] if "/@polyengine/" in m.get("specifier", "")]
     bad = {m["specifier"] for m in mods if expected_version not in m["specifier"]}
     if bad:
         print(f"pin drift in translator graph: {bad}", file=sys.stderr)

@@ -88,22 +88,22 @@ run-delegated: build _ct-tools
         --suite-artifact {{guest}} \
         --target composed-delegated --jsonl > {{results}}/composed-delegated.jsonl
 
-# The one-version-everywhere gate: every jsr:@deltic/* import across
+# The one-version-everywhere gate: every jsr:@polyengine/* import across
 # every deno.json in the repo must pin the same version (replaces the
 # retired fetch-based translator script's pin-consistency check). Runs
-# at the top of every deltic recipe below so drift fails loud immediately.
-_deltic-pin-check:
+# at the top of every polyengine recipe below so drift fails loud immediately.
+_polyengine-pin-check:
     #!/usr/bin/env bash
     set -euo pipefail
     cd {{root}}
     files=$(find . -name deno.json -not -path '*/node_modules/*')
-    v=$(grep -ho 'jsr:@deltic/[a-z-]*@[^/"]*' $files | sed 's/.*@//' | sort -u)
+    v=$(grep -ho 'jsr:@polyengine/[a-z-]*@[^/"]*' $files | sed 's/.*@//' | sort -u)
     n=$(printf '%s\n' "$v" | sed '/^$/d' | wc -l)
-    [ "$n" = 1 ] || { echo "deltic pin drift: $v" >&2; exit 1; }
+    [ "$n" = 1 ] || { echo "polyengine pin drift: $v" >&2; exit 1; }
 
-# The JS runner core's one-version gate: the deltic npm tree consuming
+# The JS runner core's one-version gate: the polyengine npm tree consuming
 # @jsr/polymorph__test (jsr:@polymorph/test through JSR's npm-compat
-# registry, per deltic/.npmrc) and deltic's own deno.lock (which also
+# registry, per polyengine/.npmrc) and polyengine's own deno.lock (which also
 # tracks that package.json dependency) must agree on one resolved
 # version — a skewed bump runs the JS harness against a Rust runner
 # from a different polymorph-test release, a subtle contract-mismatch
@@ -113,8 +113,8 @@ runner-js-pin-check:
     set -euo pipefail
     cd {{root}}
     v=$({ jq -r '.packages["node_modules/@jsr/polymorph__test"].version' \
-        conformance/driver-ct/deltic/package-lock.json; \
-        jq -r '.npm | keys[]' conformance/driver-ct/deltic/deno.lock \
+        conformance/driver-ct/polyengine/package-lock.json; \
+        jq -r '.npm | keys[]' conformance/driver-ct/polyengine/deno.lock \
         | grep '^@jsr/polymorph__test@' | sed 's/.*@//'; } | sort -u)
     if [ "$v" = "null" ] || [ -z "$v" ] || [ "$(printf '%s\n' "$v" | wc -l)" != 1 ]; then
         echo "runner-js pin drift: $v" >&2
@@ -122,36 +122,36 @@ runner-js-pin-check:
     fi
     echo "runner-js pin OK: @jsr/polymorph__test $v"
 
-# The composed artifact runtime-linked under deltic on stock Deno —
+# The composed artifact runtime-linked under polyengine on stock Deno —
 # no transpile step, no generated tree, no engine flag (callback ABI).
-# The pin and the module-graph lock live in deltic/ (see its README).
-# The translator is the packaged @deltic/translator asset, resolved
+# The pin and the module-graph lock live in polyengine/ (see its README).
+# The translator is the packaged @polyengine/translator asset, resolved
 # through the module graph (no net grant, no fetched-asset read grant).
-run-deltic: _deltic-pin-check build
+run-polyengine: _polyengine-pin-check build
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{root}}/conformance/driver-ct/deltic
+    cd {{root}}/conformance/driver-ct/polyengine
     deno run --allow-read=../../.. --allow-write=../results \
         --config deno.json --frozen run.ts \
         --suite suite-plain --missing delegated-signer \
-        --target deltic-deno
+        --target polyengine-deno
 
-# The composed-delegated artifact under deltic on stock Deno.
-run-deltic-delegated: _deltic-pin-check build
+# The composed-delegated artifact under polyengine on stock Deno.
+run-polyengine-delegated: _polyengine-pin-check build
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{root}}/conformance/driver-ct/deltic
+    cd {{root}}/conformance/driver-ct/polyengine
     deno run --allow-read=../../.. --allow-write=../results \
         --config deno.json --frozen run.ts \
         --suite suite-delegated \
-        --target deltic-deno-delegated
+        --target polyengine-deno-delegated
 
-# The deltic browser driver's npm tree (the upstream page driver +
+# The polyengine browser driver's npm tree (the upstream page driver +
 # playwright-core; no transpiler).
-_deltic-browser-prepared: build
+_polyengine-browser-prepared: build
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{root}}/conformance/driver-ct/deltic
+    cd {{root}}/conformance/driver-ct/polyengine
     if [ package-lock.json -nt node_modules/.package-lock.json ]; then
         npm ci --no-audit --no-fund
     fi
@@ -159,40 +159,40 @@ _deltic-browser-prepared: build
 # The two repo-built browser assets, from the SAME pinned JSR graph as
 # the Deno legs (no sha256 bookkeeping — the lock owns integrity).
 # Version-free output dir: the lock (not a path segment) owns the
-# deltic version now (see deltic/README.md, "Pinning").
-_deltic-browser-build: _deltic-pin-check _deltic-browser-prepared
+# polyengine version now (see polyengine/README.md, "Pinning").
+_polyengine-browser-build: _polyengine-pin-check _polyengine-browser-prepared
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{root}}/conformance/driver-ct/deltic
-    out=../../../target/deltic-browser
+    cd {{root}}/conformance/driver-ct/polyengine
+    out=../../../target/polyengine-browser
     mkdir -p "$out"
     deno bundle --config deno.json --frozen --platform browser \
-        -o "$out/deltic-embedder.mjs" browser-bundle-entry.ts
+        -o "$out/polyengine-embedder.mjs" browser-bundle-entry.ts
     info=$(mktemp)
     trap 'rm -f "$info"' EXIT
-    deno info --json --config deno.json --frozen @deltic/translator > "$info"
-    pin=$(grep -o 'jsr:@deltic/runtime@[^/"]*' deno.json | head -1 | sed 's/.*@//')
-    python3 extract-translator-wasm.py "$info" "$out/deltic-translator-shim.wasm" "$pin"
+    deno info --json --config deno.json --frozen @polyengine/translator > "$info"
+    pin=$(grep -o 'jsr:@polyengine/runtime@[^/"]*' deno.json | head -1 | sed 's/.*@//')
+    python3 extract-translator-wasm.py "$info" "$out/polyengine-translator-shim.wasm" "$pin"
 
 # Both composed artifacts runtime-linked inside headless Chromium: the
-# upstream deltic worker loads the repo-built embedder bundle and links
+# upstream polyengine worker loads the repo-built embedder bundle and links
 # the suite in the browser — no transpile step, no generated tree.
-run-deltic-browser: _deltic-browser-build
+run-polyengine-browser: _polyengine-browser-build
     #!/usr/bin/env bash
     set -euo pipefail
-    cd {{root}}/conformance/driver-ct/deltic
+    cd {{root}}/conformance/driver-ct/polyengine
     node run-browser.mjs
 
-# Runs the deltic browser leg under CI or CONFORMANCE_BROWSER=1;
+# Runs the polyengine browser leg under CI or CONFORMANCE_BROWSER=1;
 # otherwise clears stale results so the standing run is deterministic.
-_run-deltic-browser-if-enabled:
+_run-polyengine-browser-if-enabled:
     #!/usr/bin/env bash
     set -euo pipefail
     if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CONFORMANCE_BROWSER:-}" = "1" ]; then
-        cd {{root}} && just conformance-ct::run-deltic-browser
+        cd {{root}} && just conformance-ct::run-polyengine-browser
     else
         cd {{root}}
-        rm -f {{results}}/deltic-browser.jsonl {{results}}/deltic-browser-delegated.jsonl
+        rm -f {{results}}/polyengine-browser.jsonl {{results}}/polyengine-browser-delegated.jsonl
     fi
 
 # The on-demand third target: the `tls-delegated` world over the
@@ -233,22 +233,22 @@ aggregate: _ct-tools
     cd {{root}}
     extra=()
     [ -f {{results}}/composed-delegated-webcrypto.jsonl ] && extra+=(--results composed-delegated-webcrypto={{results}}/composed-delegated-webcrypto.jsonl)
-    [ -f {{results}}/deltic-browser.jsonl ] && extra+=(--results deltic-browser={{results}}/deltic-browser.jsonl)
-    [ -f {{results}}/deltic-browser-delegated.jsonl ] && extra+=(--results deltic-browser-delegated={{results}}/deltic-browser-delegated.jsonl)
+    [ -f {{results}}/polyengine-browser.jsonl ] && extra+=(--results polyengine-browser={{results}}/polyengine-browser.jsonl)
+    [ -f {{results}}/polyengine-browser-delegated.jsonl ] && extra+=(--results polyengine-browser-delegated={{results}}/polyengine-browser-delegated.jsonl)
     {{ct}} aggregate \
         --lock conformance/guest-ct/tests.lock \
         --manifest conformance/driver-ct/targets.toml \
         --results composed={{results}}/composed.jsonl \
         --results composed-delegated={{results}}/composed-delegated.jsonl \
-        --results deltic-deno={{results}}/deltic-deno.jsonl \
-        --results deltic-deno-delegated={{results}}/deltic-deno-delegated.jsonl \
+        --results polyengine-deno={{results}}/polyengine-deno.jsonl \
+        --results polyengine-deno-delegated={{results}}/polyengine-deno-delegated.jsonl \
         ${extra[@]+"${extra[@]}"} \
         -o {{results}}/matrix.md
 
 # The standing matrix: inventory check, all standing targets,
 # aggregate. Stale on-demand webcrypto results are cleared first so the
 # standing run is deterministic.
-all: lock-check run-composed run-delegated run-deltic run-deltic-delegated _run-deltic-browser-if-enabled _clear-webcrypto aggregate
+all: lock-check run-composed run-delegated run-polyengine run-polyengine-delegated _run-polyengine-browser-if-enabled _clear-webcrypto aggregate
 
 _clear-webcrypto:
     rm -f results/composed-delegated-webcrypto.jsonl

@@ -1,0 +1,14 @@
+{
+  "//": "The polyengine pin: every @polyengine/* import is an exact-pinned JSR release (caret-honest upstream: within a minor line releases stay compatible, breaking bumps the minor; per-commit `<next>-pre.g<hash>` prereleases exist between releases — pin exactly); @polyengine/translator ships the translator wasm for the SAME commit. deno.lock carries integrity, --frozen enforced. One version repo-wide is asserted by the pin gate (../justfile). minimumDependencyAge excludes our own coordinated packages from the freshness gate, in both forms consumed here: direct jsr: imports and the @jsr/polymorph__test runner core pulled in via npm-compat (npm:@jsr/polymorph__*).",
+  "imports": {
+    "@polyengine/ct-runner": "jsr:@polyengine/ct-runner@0.3.0",
+    "@polyengine/runtime/embedder": "jsr:@polyengine/runtime@0.3.0/embedder",
+    "@polyengine/runtime/shim": "jsr:@polyengine/runtime@0.3.0/shim",
+    "@polyengine/wasi": "jsr:@polyengine/wasi@0.3.0",
+    "@polyengine/translator": "jsr:@polyengine/translator@0.3.0"
+  },
+  "minimumDependencyAge": { "age": "P1D", "exclude": ["jsr:@polyengine/*", "jsr:@polymorph/*", "npm:@jsr/polymorph__*"] },
+  "tasks": {
+    "check": "deno check run.ts browser-bundle-entry.ts"
+  }
+}
