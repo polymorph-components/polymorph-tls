@@ -1,7 +1,7 @@
-// The deltic leg of the conformance harness: runs a composed artifact
+// The polyengine leg of the conformance harness: runs a composed artifact
 // (the shared suite fused with one TLS delivery) runtime-linked under
-// deltic on stock Deno, and writes component-test results JSONL for the
-// aggregate — the deltic analogue of the retired jco run-node.mjs
+// polyengine on stock Deno, and writes component-test results JSONL for the
+// aggregate — the polyengine analogue of the retired jco run-node.mjs
 // (removed with the jco legs; see git history), mirroring its
 // frame exactly:
 //
@@ -11,30 +11,30 @@
 //   bindImports (preview2-shim, both      | wasi() (track-keyed:
 //     wasi minor spellings bound)         |   one @0.2 provider serves
 //                                         |   every minor)
-//   inventoryLookup(coreBytes) + missing  | deltic reads the suite's own
+//   inventoryLookup(coreBytes) + missing  | polyengine reads the suite's own
 //     via runSuiteJsonl                   |   embedded inventory; missing
-//                                         |   via runSuite (deltic#25)
+//                                         |   via runSuite (polyengine#25)
 //   node --experimental-wasm-jspi         | stock deno, callback ABI —
 //                                         |   no engine flag
 //
 // The artifacts import only wasi 0.2 and test-context, so there is no
 // SUT host module on this leg (the TLS delivery is fused in-guest);
-// deltic's runner supplies test-context itself. No network, no PKI:
+// polyengine's runner supplies test-context itself. No network, no PKI:
 // the suite's cryptography runs in-guest.
 //
 //   deno run --allow-read=../../.. --allow-write=../results \
 //     --config deno.json --frozen run.ts --suite suite-plain \
-//     --missing delegated-signer --target deltic-deno
+//     --missing delegated-signer --target polyengine-deno
 //
-// The translator is the packaged @deltic/translator asset, loaded
+// The translator is the packaged @polyengine/translator asset, loaded
 // through the module graph (no net grant, no read grant for a fetched
 // wasm) — see README.md's "Pinning" section.
 
-import { Translator } from "@deltic/runtime/shim";
-import type { ComponentArtifacts } from "@deltic/runtime/embedder";
-import { runSuite } from "@deltic/ct-runner";
-import { wasi } from "@deltic/wasi";
-import { defaultTranslator } from "@deltic/translator";
+import { Translator } from "@polyengine/runtime/shim";
+import type { ComponentArtifacts } from "@polyengine/runtime/embedder";
+import { runSuite } from "@polyengine/ct-runner";
+import { wasi } from "@polyengine/wasi";
+import { defaultTranslator } from "@polyengine/translator";
 
 const ROOT = new URL("../../../", import.meta.url);
 const RESULTS = new URL("../results/", import.meta.url);
@@ -63,7 +63,7 @@ interface Cli {
   missing: string[];
   // Optional: an explicit translator shim wasm path, for callers that
   // source their own build (e.g. a local dev override). Defaults to the
-  // packaged @deltic/translator asset (defaultTranslator()); see
+  // packaged @polyengine/translator asset (defaultTranslator()); see
   // README.md's "Pinning" section.
   translator?: string;
 }

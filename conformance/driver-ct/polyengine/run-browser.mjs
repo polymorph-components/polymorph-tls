@@ -1,11 +1,11 @@
-// The deltic-browser leg: both composed artifacts run runtime-linked
+// The polyengine-browser leg: both composed artifacts run runtime-linked
 // inside headless Chromium — the page, worker pool, stall watchdog, and
 // Chrome ladder all live in @jsr/polymorph__test, and the
-// upstream DELTIC worker (runner-deltic/browser-worker.mjs) loads the
-// pinned deltic-embedder.mjs release asset and links the suite in the
+// upstream polyengine worker (runner-polyengine/browser-worker.mjs) loads the
+// pinned polyengine-embedder.mjs release asset and links the suite in the
 // browser: no transpile step, no generated tree. This file is the frame:
 // asset URL wiring, target configuration, and results-file writing —
-// the browser sibling of ../deltic/run.ts (as the retired jco
+// the browser sibling of ../polyengine/run.ts (as the retired jco
 // run-browser.mjs was of its run-node.mjs; see git history).
 //
 // The artifacts import only wasi 0.2 and test-context, so there is no
@@ -14,7 +14,7 @@
 //
 // Gates in CI (the Actions runner image ships Chrome); locally it runs
 // under CONFORMANCE_BROWSER=1 (`just conformance-ct::all`) or directly
-// via `just conformance-ct::run-deltic-browser`. The justfile recipe
+// via `just conformance-ct::run-polyengine-browser`. The justfile recipe
 // builds the two browser assets first (deno bundle for the embedder,
 // deno info + copy for the translator wasm — both from the SAME pinned
 // JSR graph as the Deno legs; see README.md's "Pinning" section), served to the
@@ -31,37 +31,37 @@ import {
 } from "@jsr/polymorph__test/browser-driver";
 import { writeResultsFile } from "@jsr/polymorph__test/node-runner";
 
-const DELTIC_DIR = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = join(DELTIC_DIR, "..", "..", "..");
-// Version-free: the lock (not a path segment) owns the deltic version now
+const POLYENGINE_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(POLYENGINE_DIR, "..", "..", "..");
+// Version-free: the lock (not a path segment) owns the polyengine version now
 // (see README.md's "Pinning" section). Built by the justfile's
 // browser-asset recipes before this script runs.
-const ASSETS = `/target/deltic-browser`;
+const ASSETS = `/target/polyengine-browser`;
 const CASE_TIMEOUT_MS = 60_000;
 const STALL_TIMEOUT_MS = 90_000;
 
 const { values } = parseArgs({
   options: {
-    out: { type: "string", default: join(DELTIC_DIR, "..", "results") },
+    out: { type: "string", default: join(POLYENGINE_DIR, "..", "results") },
   },
 });
 
 const common = {
   suite: "conformance-guest-ct",
-  bundleUrl: `${ASSETS}/deltic-embedder.mjs`,
-  translatorUrl: `${ASSETS}/deltic-translator-shim.wasm`,
+  bundleUrl: `${ASSETS}/polyengine-embedder.mjs`,
+  translatorUrl: `${ASSETS}/polyengine-translator-shim.wasm`,
   caseTimeoutMs: CASE_TIMEOUT_MS,
 };
 const SUITES = [
   {
     ...common,
-    target: "deltic-browser",
+    target: "polyengine-browser",
     suiteUrl: "/target/conformance/suite-plain.wasm",
     missing: ["delegated-signer"],
   },
   {
     ...common,
-    target: "deltic-browser-delegated",
+    target: "polyengine-browser-delegated",
     suiteUrl: "/target/conformance/suite-delegated.wasm",
     missing: [],
   },
@@ -74,10 +74,10 @@ const outcome = await runPageHarness({
   executablePath: await findChrome(),
   repoRoot: REPO_ROOT,
   html: buildHarnessPage({
-    title: "polymorph:tls conformance (deltic-browser)",
+    title: "polymorph:tls conformance (polyengine-browser)",
     config: {
       jobs: 1,
-      workerUrl: `${MOUNT}/runner-deltic/browser-worker.mjs`,
+      workerUrl: `${MOUNT}/runner-polyengine/browser-worker.mjs`,
       suites: SUITES,
     },
   }),

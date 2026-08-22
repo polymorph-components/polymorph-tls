@@ -11,7 +11,7 @@ two deliveries, and the QUIC compatibility layer exist; they pass a
 cross-implementation [conformance suite](conformance/README.md) on the
 [`polymorph:test`](https://github.com/polymorph-components/polymorph-test)
 harness (one shared guest suite against every composed delivery, under
-Wasmtime, under deltic on stock Deno, and in headless Chromium),
+Wasmtime, under polyengine on stock Deno, and in headless Chromium),
 cross-implementation interop against OpenSSL, Go `crypto/tls`, and
 quic-go over real transports, and a scheduled dudect-style
 [timing lab](timing-lab/README.md), with the performance tradeoff
@@ -25,7 +25,7 @@ Everything here is **unstable** (0.x), but [releases](../../releases) are
 **caret-honest**: within a minor line they stay backward-compatible, and
 anything breaking bumps the minor. Consumption is pinned at a release's
 commit — cargo git dependencies, vendored WIT, the release-pinned
-deltic/JSR graph — and bumped deliberately.
+polyengine/JSR graph — and bumped deliberately.
 
 ## Why pure-wasm TLS 1.3 is plausible
 

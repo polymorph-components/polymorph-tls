@@ -2,10 +2,10 @@
 # A target is a composition of the shared suite with one delivery of
 # the algorithm profile: the wasmtime rows run under the generic
 # component-test host runner (the composed artifact imports only wasi
-# and test-context), and the deltic rows runtime-link the same
-# artifacts under the JSR-pinned deltic runtime — on stock Deno
-# (driver-ct/deltic/run.ts) and inside headless Chromium
-# (driver-ct/deltic/run-browser.mjs).
+# and test-context), and the polyengine rows runtime-link the same
+# artifacts under the JSR-pinned polyengine runtime — on stock Deno
+# (driver-ct/polyengine/run.ts) and inside headless Chromium
+# (driver-ct/polyengine/run-browser.mjs).
 #
 # The browser rows gate in CI (the Actions image ships Chrome);
 # locally they run under CONFORMANCE_BROWSER=1, so they are declared
@@ -28,14 +28,14 @@ missing-features = ["delegated-signer"]
 [targets.composed-delegated]
 missing-features = []
 
-# The composed artifact runtime-linked under deltic on stock Deno
-# (driver-ct/deltic/run.ts): no transpile step, no engine flag — the
+# The composed artifact runtime-linked under polyengine on stock Deno
+# (driver-ct/polyengine/run.ts): no transpile step, no engine flag — the
 # release-pinned runtime links the component at load time.
-[targets.deltic-deno]
+[targets.polyengine-deno]
 missing-features = ["delegated-signer"]
 
-# The composed-delegated artifact under deltic on stock Deno.
-[targets.deltic-deno-delegated]
+# The composed-delegated artifact under polyengine on stock Deno.
+[targets.polyengine-deno-delegated]
 missing-features = []
 
 # As composed-delegated, but the signer is the webcrypto-signer shim
@@ -49,13 +49,13 @@ missing-features = []
 optional = true
 
 # The composed artifact runtime-linked inside headless Chromium (the
-# upstream deltic worker; no transpile step).
-[targets.deltic-browser]
+# upstream polyengine worker; no transpile step).
+[targets.polyengine-browser]
 missing-features = ["delegated-signer"]
 optional = true
 
 # The composed-delegated artifact runtime-linked inside headless
 # Chromium.
-[targets.deltic-browser-delegated]
+[targets.polyengine-browser-delegated]
 missing-features = []
 optional = true
