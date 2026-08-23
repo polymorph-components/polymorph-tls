@@ -27,7 +27,7 @@ target here.
 
 ## Pinning
 
-polyengine is pinned to an exact JSR release (`0.4.0`; see `deno.json`'s
+polyengine is pinned to an exact JSR release (`0.5.0`; see `deno.json`'s
 import-map, `deno.lock` carries module-graph integrity, enforced with
 `--frozen`). The browser leg's embedder bundle and translator wasm are
 built from that SAME pinned graph (`../justfile`'s
