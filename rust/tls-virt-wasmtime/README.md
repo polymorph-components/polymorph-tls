@@ -59,10 +59,7 @@ offered cipher suites are the profile's, verbatim.
   the stream again; `shutdown(send)` and output-stream drop both
   become close_notify; and name lookup drains the delegated
   `resolve-address-stream` through the wrapped resource before
-  yielding the one handle address. Unlike the 0.3 tunnel path, 0.2
-  tunnel connects **do** pass the sandbox address check against the
-  real destination: the 0.2 `network` resource exposes
-  `check_socket_addr` publicly.
+  yielding the one handle address.
 
 ## Findings (contrasts with the guest virtualizer)
 
@@ -102,9 +99,9 @@ Trust roots are the repository's baked test fixtures
 options on a tunneled socket reach the parked placeholder socket rather
 than the tunnel's transport (as does `get-address-family`), and TLS
 failures surface as `connection-reset`/stream closure with detail on
-stderr only. On the 0.3 path, tunnel connects bypass the sandbox
-address check (see the findings above); the 0.2 path enforces it. See
-issue #16 for the productionization gaps.
+stderr only. Tunnel connects on both paths bypass the sandbox address
+check (see the findings above). See issue #16 for the productionization
+gaps.
 
 ## Running
 

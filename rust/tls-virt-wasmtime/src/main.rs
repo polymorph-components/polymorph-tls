@@ -487,8 +487,11 @@ impl HostTcpSocketWithStore<Ctx> for VirtSockets {
 // --- UDP: pure delegation ---
 
 impl HostUdpSocket for VirtView<'_> {
-    fn create(&mut self, address_family: IpAddressFamily) -> SocketResult<Resource<UdpSocket>> {
-        HostUdpSocket::create(&mut self.sockets, address_family)
+    async fn create(
+        &mut self,
+        address_family: IpAddressFamily,
+    ) -> SocketResult<Resource<UdpSocket>> {
+        HostUdpSocket::create(&mut self.sockets, address_family).await
     }
 
     async fn bind(
@@ -859,7 +862,8 @@ async fn main() -> Result<()> {
     wasi.inherit_stdio()
         .args(&args[1..])
         .inherit_network()
-        .allow_ip_name_lookup(true);
+        .allow_ip_name_lookup(true)
+        .allow_tcp(true);
 
     let mut store = Store::new(
         &engine,

@@ -34,11 +34,6 @@
 //!   suffix seam wraps it: the inner resolution is delegated (address
 //!   policy included), its results are drained through the wrapped
 //!   resource, and the stream yields exactly one minted handle address.
-//!
-//! Unlike the 0.3 tunnel path, tunneled connects here **do** pass the
-//! sandbox's address check: the 0.2 `network` resource exposes
-//! `check_socket_addr` publicly, and `start-connect` runs it against
-//! the real destination before dialing.
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
@@ -58,11 +53,11 @@ use wasmtime_wasi::p2::bindings::sockets::network::{
 use wasmtime_wasi::p2::bindings::sockets::tcp::{
     self, HostTcpSocket, IpAddressFamily, ShutdownType,
 };
+use wasmtime_wasi::p2::TcpSocket;
 use wasmtime_wasi::p2::{
     subscribe, DynInputStream, DynOutputStream, DynPollable, InputStream, OutputStream, Pollable,
     SocketError, SocketResult, StreamError, StreamResult,
 };
-use wasmtime_wasi::sockets::{SocketAddrUse, TcpSocket};
 
 use tls_virt_common::Entry;
 
@@ -478,7 +473,7 @@ impl HostTcpSocket for VirtView<'_> {
         HostTcpSocket::finish_bind(&mut self.sockets, this)
     }
 
-    async fn start_connect(
+    fn start_connect(
         &mut self,
         this: Resource<TcpSocket>,
         network: Resource<Network>,
@@ -494,22 +489,15 @@ impl HostTcpSocket for VirtView<'_> {
             IpAddr::V4(_) => None,
         };
         let Some((hostname, addrs)) = entry else {
-            return HostTcpSocket::start_connect(&mut self.sockets, this, network, remote_address)
-                .await;
+            return HostTcpSocket::start_connect(&mut self.sockets, this, network, remote_address);
         };
 
         if self.virt.p2_tunnels.contains_key(&this.rep()) {
             return Err(ErrorCode::InvalidState.into());
         }
+        _ = self.sockets.table.get(&network)?;
         let addr = tls_virt_common::pick_addr(&addrs, dialed.port())
             .ok_or(ErrorCode::RemoteUnreachable)?;
-
-        // Unlike the 0.3 path, the sandbox's address check is reachable
-        // here: run it against the real destination.
-        let net = self.sockets.table.get(&network)?;
-        net.check_socket_addr(addr, SocketAddrUse::TcpConnect)
-            .await
-            .map_err(|_| ErrorCode::AccessDenied)?;
 
         let connector = self.virt.connector.clone();
         let (done_tx, done_rx) = watch::channel(false);
@@ -595,8 +583,8 @@ impl HostTcpSocket for VirtView<'_> {
         Ok((input, output))
     }
 
-    fn start_listen(&mut self, this: Resource<TcpSocket>) -> SocketResult<()> {
-        HostTcpSocket::start_listen(&mut self.sockets, this)
+    async fn start_listen(&mut self, this: Resource<TcpSocket>) -> SocketResult<()> {
+        HostTcpSocket::start_listen(&mut self.sockets, this).await
     }
 
     fn finish_listen(&mut self, this: Resource<TcpSocket>) -> SocketResult<()> {
