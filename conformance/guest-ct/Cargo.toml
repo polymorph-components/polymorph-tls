@@ -10,10 +10,9 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# The SDK owns the polymorph:test contract bindings (its own wit-bindgen
-# 0.60 line); the SUT bindings below must stay on the same line so the
-# two binding sets share one async runtime — mixing async-runtime
-# versions in one binary risks split waitable state.
+# The SDK's contract bindings and the SUT bindings below must share one
+# wit-bindgen line so the two binding sets share one async runtime —
+# mixing async-runtime versions in one binary risks split waitable state.
 component-test-sdk = { workspace = true }
 wit-bindgen = { workspace = true }
 futures = { workspace = true }
