@@ -12,4 +12,4 @@ crate-type = ["cdylib"]
 [dependencies]
 wasip3 = { workspace = true }
 futures = { workspace = true }
-wit-bindgen = { version = "0.57", features = ["async"] }
+wit-bindgen = { workspace = true }

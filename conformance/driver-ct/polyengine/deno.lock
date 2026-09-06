@@ -7,7 +7,7 @@
     "jsr:@polyengine/runtime@~0.6.3": "0.6.3",
     "jsr:@polyengine/translator@0.6.3": "0.6.3",
     "jsr:@polyengine/wasi@0.6.3": "0.6.3",
-    "npm:@jsr/polymorph__test@0.3.0": "0.3.0",
+    "npm:@jsr/polymorph__test@0.3.1": "0.3.1",
     "npm:playwright-core@1.62.1": "1.62.1"
   },
   "jsr": {
@@ -41,9 +41,9 @@
     }
   },
   "npm": {
-    "@jsr/polymorph__test@0.3.0": {
-      "integrity": "sha512-NlpHmd5fA3KB/aAaXrBW4KX57UXkl/V9+RLa+fchFUsjASsigthEHMEiiNozRYN/l3xgsKMSC7J3IPp9VtECsQ==",
-      "tarball": "https://npm.jsr.io/~/11/@jsr/polymorph__test/0.3.0.tgz"
+    "@jsr/polymorph__test@0.3.1": {
+      "integrity": "sha512-IIwmnw5F/JHgpuQUzHL+qFJ6lv+gr4mNuXRf2VXVqUQhaf1UaqdgOFHbN2bcsIVtZR3JH+2xKcODB3/SRcJJWg==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/polymorph__test/0.3.1.tgz"
     },
     "playwright-core@1.62.1": {
       "integrity": "sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==",
@@ -59,7 +59,7 @@
     ],
     "packageJson": {
       "dependencies": [
-        "npm:@jsr/polymorph__test@0.3.0",
+        "npm:@jsr/polymorph__test@0.3.1",
         "npm:playwright-core@1.62.1"
       ]
     }

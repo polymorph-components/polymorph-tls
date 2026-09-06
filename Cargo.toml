@@ -43,8 +43,11 @@ polymorph-tls-quic = { path = "rust/quic" }
 tls-virt-common = { path = "rust/tls-virt-common" }
 
 wasi = "0.14"
-wit-bindgen = { version = "0.60", features = ["async-spawn"] }
-wasip3 = "0.7"
+# One wit-bindgen line for every async binding set (wasip3,
+# component-test-sdk, our own): two async runtimes in one guest split
+# waitable state.
+wit-bindgen = { version = "0.61", features = ["async-spawn"] }
+wasip3 = "0.8"
 futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
 
 # The conformance stack: the Rust crates pinned by git rev, the JS
@@ -58,7 +61,7 @@ futures = { version = "0.3", default-features = false, features = ["std", "async
 # the cargo pins gate, the runner-js pin gate
 # (conformance-ct::runner-js-pin-check), and the CI ref guard fail on
 # skew.
-component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "fac2b5158977389a6324ca4264dba7440f4e1ada" }
+component-test-sdk = { git = "https://github.com/polymorph-components/polymorph-test", rev = "3631d4a1eedfb40d0ad24c68ac5b22ec8ed8d935" }
 
 aead = { version = "0.6", default-features = false, features = ["alloc"] }
 aes = { version = "0.9", features = ["zeroize"] }

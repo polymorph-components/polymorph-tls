@@ -10,9 +10,6 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-# Pinned to wasip3's wit-bindgen line: the app links both runtimes'
-# generated code, and mixing async-runtime versions in one binary risks
-# split waitable state.
-wit-bindgen = { version = "0.57", features = ["async"] }
+wit-bindgen = { workspace = true }
 wasip3 = { workspace = true }
 futures = { workspace = true }
