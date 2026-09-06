@@ -29,8 +29,10 @@
 //! ```
 //!
 //! Runs the component's `wasi:cli/run@0.3.0` export with stdio
-//! inherited, network inherited, and name lookup allowed. Limits are
-//! recorded in README.md.
+//! inherited, network inherited, and name lookup allowed. A tunnel
+//! connect resolves the destination, runs the embedder's sandbox
+//! address check against it, and only then dials. Limits are recorded
+//! in README.md.
 
 mod p2;
 
@@ -61,8 +63,21 @@ use wasmtime_wasi::p3::bindings::sockets::types::{
 };
 use wasmtime_wasi::p3::bindings::Command;
 use wasmtime_wasi::p3::sockets::{SocketError, SocketResult};
-use wasmtime_wasi::sockets::{WasiSockets, WasiSocketsCtxView};
+use wasmtime_wasi::sockets::{SocketAddrUse, WasiSockets, WasiSocketsCtxView};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
+
+/// The sandbox address policy: the same closure installed on the
+/// `WasiCtx` via `WasiCtxBuilder::socket_addr_check`. The host runs it
+/// against a tunnel's real destination before dialing, so delegated
+/// sockets and tunnels share one policy.
+pub(crate) type AddrCheck = Arc<
+    dyn Fn(
+            SocketAddr,
+            SocketAddrUse,
+        ) -> Pin<Box<dyn std::future::Future<Output = bool> + Send + Sync>>
+        + Send
+        + Sync,
+>;
 
 /// Trust anchor for tunneled connections (the repository's test CA;
 /// see README.md).
@@ -117,6 +132,8 @@ pub(crate) struct VirtCtx {
     /// Runtime handle for the close_notify shutdown task (spawned from
     /// a `Drop` impl, which cannot await).
     pub(crate) runtime: tokio::runtime::Handle,
+    /// The sandbox address policy; see `AddrCheck`.
+    pub(crate) addr_check: AddrCheck,
 }
 
 struct Tunnel {
@@ -131,7 +148,7 @@ struct Tunnel {
 }
 
 impl VirtCtx {
-    fn new() -> Result<Self> {
+    fn new(addr_check: AddrCheck) -> Result<Self> {
         let mut roots = rustls::RootCertStore::empty();
         roots
             .add(CertificateDer::from(ROOT.to_vec()))
@@ -145,6 +162,7 @@ impl VirtCtx {
             p2_resolves: HashMap::new(),
             connector: TlsConnector::from(Arc::new(config)),
             runtime: tokio::runtime::Handle::current(),
+            addr_check,
         })
     }
 
@@ -368,7 +386,15 @@ impl HostTcpSocketWithStore<Ctx> for VirtSockets {
         // The guest's socket resource stays in its unconnected state and
         // serves only as the handle the tunnel is keyed under.
         let addr = tls_virt_common::pick_addr(&addrs, port).ok_or(ErrorCode::RemoteUnreachable)?;
-        let connector = accessor.with(|mut a| a.get().virt.connector.clone());
+        let (connector, check) = accessor.with(|mut a| {
+            (
+                a.get().virt.connector.clone(),
+                a.get().virt.addr_check.clone(),
+            )
+        });
+        if !check(addr, SocketAddrUse::TcpConnect).await {
+            return Err(ErrorCode::AccessDenied.into());
+        }
 
         let stream = TcpStream::connect(addr).await.map_err(ErrorCode::from)?;
         let local = stream.local_addr().ok();
@@ -858,10 +884,14 @@ async fn main() -> Result<()> {
     types::add_to_linker::<Ctx, VirtSockets>(&mut linker, virt_view)?;
     ip_name_lookup::add_to_linker::<Ctx, VirtSockets>(&mut linker, virt_view)?;
 
+    let addr_check: AddrCheck = Arc::new(|_, _| Box::pin(async { true }));
     let mut wasi = WasiCtxBuilder::new();
     wasi.inherit_stdio()
         .args(&args[1..])
-        .inherit_network()
+        .socket_addr_check({
+            let check = addr_check.clone();
+            move |addr, use_| check(addr, use_)
+        })
         .allow_ip_name_lookup(true)
         .allow_tcp(true);
 
@@ -870,7 +900,7 @@ async fn main() -> Result<()> {
         Ctx {
             wasi: wasi.build(),
             table: ResourceTable::new(),
-            virt: VirtCtx::new()?,
+            virt: VirtCtx::new(addr_check)?,
         },
     );
     // The guest picks its world by its exports: a 0.3 command runs

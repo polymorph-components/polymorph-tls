@@ -85,12 +85,12 @@ offered cipher suites are the profile's, verbatim.
 - **Delegation is trait-deep only.** wasmtime-wasi's trait impls are
   public and callable, but everything beneath them is `pub(crate)`:
   the `TcpSocket` state machine cannot be constructed or driven
-  externally, and `SocketAddrCheck` cannot be invoked directly. In
-  consequence the tunnel's own connect bypasses the sandbox's address
-  check (its transport is native tokio); only the inner name
-  resolution of opted-in names goes through wasmtime-wasi and its
-  `allow-ip-name-lookup` gate. A production wrapper would need its own
-  address policy for tunneled connects.
+  externally, and the installed address check is not readable back
+  from the `WasiCtx`. The check is the embedder's closure, though
+  (`WasiCtxBuilder::socket_addr_check`), so the host keeps its own
+  handle to it and runs it against a tunnel's real destination before
+  dialing (the transport is native tokio) — delegated sockets and
+  tunnels share one policy.
 
 ## Limits
 
@@ -99,9 +99,7 @@ Trust roots are the repository's baked test fixtures
 options on a tunneled socket reach the parked placeholder socket rather
 than the tunnel's transport (as does `get-address-family`), and TLS
 failures surface as `connection-reset`/stream closure with detail on
-stderr only. Tunnel connects on both paths bypass the sandbox address
-check (see the findings above). See issue #16 for the productionization
-gaps.
+stderr only. See issue #16 for the productionization gaps.
 
 ## Running
 
