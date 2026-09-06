@@ -12,11 +12,12 @@
 //! The 0.2 shapes change the tunnel plumbing:
 //!
 //! - `start-connect`/`finish-connect` are a two-phase, poll-driven
-//!   pair: start spawns the TCP+TLS handshake as a background task;
-//!   finish reports would-block until it resolves; `subscribe` on a
-//!   tunnel socket returns a pollable over the handshake's completion
-//!   (a fresh owned table entry per call, so the pollable's lifetime
-//!   manages it).
+//!   pair: start spawns a background task that runs the sandbox
+//!   address check against the resolved destination, then the TCP+TLS
+//!   handshake; finish reports would-block until it resolves;
+//!   `subscribe` on a tunnel socket returns a pollable over the
+//!   handshake's completion (a fresh owned table entry per call, so
+//!   the pollable's lifetime manages it).
 //! - The data path is `wasi:io` streams, not component-model streams:
 //!   the returned input/output streams are this module's
 //!   [`TlsInputStream`]/[`TlsOutputStream`], byte buffers over the TLS
@@ -58,6 +59,7 @@ use wasmtime_wasi::p2::{
     subscribe, DynInputStream, DynOutputStream, DynPollable, InputStream, OutputStream, Pollable,
     SocketError, SocketResult, StreamError, StreamResult,
 };
+use wasmtime_wasi::sockets::SocketAddrUse;
 
 use tls_virt_common::Entry;
 
@@ -500,11 +502,15 @@ impl HostTcpSocket for VirtView<'_> {
             .ok_or(ErrorCode::RemoteUnreachable)?;
 
         let connector = self.virt.connector.clone();
+        let check = self.virt.addr_check.clone();
         let (done_tx, done_rx) = watch::channel(false);
         let result: Arc<Mutex<Option<Result<TlsParts, ErrorCode>>>> = Arc::new(Mutex::new(None));
         let slot = Arc::clone(&result);
         self.virt.runtime.spawn(async move {
             let outcome = async {
+                if !check(addr, SocketAddrUse::TcpConnect).await {
+                    return Err(ErrorCode::AccessDenied);
+                }
                 let stream = TcpStream::connect(addr).await.map_err(ErrorCode::from)?;
                 let local = stream.local_addr().ok();
                 let server_name = ServerName::try_from(hostname.clone())
